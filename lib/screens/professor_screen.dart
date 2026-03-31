@@ -19,19 +19,22 @@ class _ProfessorScreenState extends State<ProfessorScreen> {
   }
 
   Future<void> createSession() async {
-    String otp = generateOTP();
+    try {
+      String otp = generateOTP();
 
-    await FirebaseFirestore.instance.collection('attendance_sessions').add({
-      'otp': otp,
-      'createdAt': FieldValue.serverTimestamp(),
-      'students': []
-    });
+      await FirebaseFirestore.instance.collection('attendance_sessions').add({
+        'otp': otp,
+        'createdAt': FieldValue.serverTimestamp(),
+        'students': []
+      });
 
-    setState(() {
-      generatedOtp = otp;
-    });
+      setState(() {
+        generatedOtp = otp;
+      });
+    } catch (e) {
+      print("Error creating session: $e");
+    }
   }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -50,6 +53,23 @@ class _ProfessorScreenState extends State<ProfessorScreen> {
 
             SizedBox(height: 20),
 
+            if (generatedOtp.isNotEmpty) ...[
+              Text(
+                "Your OTP is:",
+                style: TextStyle(fontSize: 16, color: Colors.grey),
+              ),
+              Text(
+                generatedOtp,
+                style: TextStyle(
+                  fontSize: 32,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 4,
+                  color: Colors.blue,
+                ),
+              ),
+              SizedBox(height: 20),
+            ],
+
             ElevatedButton(
               onPressed: () {
 
@@ -57,7 +77,7 @@ class _ProfessorScreenState extends State<ProfessorScreen> {
               },
               child: Text("View Present Students"),
               style: ElevatedButton.styleFrom(
-                maximumSize: Size(double.infinity, 50),
+                minimumSize: Size(double.infinity, 50),
               ),
             ),
           ],
