@@ -40,6 +40,8 @@ class _StudentScreenState extends State<StudentScreen> {
       }
 
       // ✅ Accurate location (2 readings)
+
+
       Future<Position> getAccurateLocation() async {
         Position pos1 = await Geolocator.getCurrentPosition(
             desiredAccuracy: LocationAccuracy.best);
@@ -52,7 +54,8 @@ class _StudentScreenState extends State<StudentScreen> {
         return pos1.accuracy < pos2.accuracy ? pos1 : pos2;
       }
 
-      Position studentPos = await getAccurateLocation();
+      Position? studentPos = await safeGetLocation(context);
+      if (studentPos == null) return;
 
       // ❌ Reject low accuracy
       if (studentPos.accuracy > 30) {

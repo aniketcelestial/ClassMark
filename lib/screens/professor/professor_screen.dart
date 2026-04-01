@@ -54,7 +54,8 @@ class _ProfessorScreenState extends State<ProfessorScreen> {
         return pos1.accuracy < pos2.accuracy ? pos1 : pos2;
       }
 
-      Position position = await getAccurateLocation();
+      Position? position = await safeGetLocation(context);
+      if (position == null) return;
 
       // ❌ Reject poor accuracy
       if (position.accuracy > 30) {
