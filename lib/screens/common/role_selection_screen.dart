@@ -7,15 +7,16 @@ class RoleSelectionScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("ClassMark")),
-      body: Center(
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _roleBox(context, "Professor", "professor"),
-            const SizedBox(width: 20),
-            _roleBox(context, "Student", "student"),
-          ],
+      body: SafeArea(
+        child: Center(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Expanded(child: _roleBox(context, "Professor", "professor")),
+              const SizedBox(width: 20),
+              Expanded(child: _roleBox(context, "Student", "student")),
+            ],
+          ),
         ),
       ),
     );
