@@ -1,70 +1,125 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../models/attendance_model.dart';
+import 'package:classmark/widgets/custom_button.dart';
 
 class StudentScreen extends StatefulWidget {
-  const StudentScreen({super.key});
-
   @override
-  State<StudentScreen> createState() => _StudentScreenState();
+  _StudentScreenState createState() => _StudentScreenState();
 }
 
 class _StudentScreenState extends State<StudentScreen> {
   final TextEditingController otpController = TextEditingController();
+  bool isSubmitting = false;
+  bool showOtpField = false;
 
-  Future<void> verifyOTP() async {
-    String enteredOtp = otpController.text.trim();
+  Future<void> submitOtp() async {
+    final otp = otpController.text.trim();
+    if (otp.isEmpty) return;
 
-    if (enteredOtp.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please enter OTP")),
-      );
-      return;
-    }
+    setState(() => isSubmitting = true);
 
-    final user = FirebaseAuth.instance.currentUser;
+    try {
+      String uid = FirebaseAuth.instance.currentUser!.uid;
 
-    if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("User not logged in")),
-      );
-      return;
-    }
+      var snapshot = await FirebaseFirestore.instance
+          .collection('attendance_sessions')
+          .where('otp', isEqualTo: otp)
+          .get();
 
-    String uid = user.uid;
-
-    var snapshot = await FirebaseFirestore.instance
-        .collection('attendance_sessions')
-        .where('otp', isEqualTo: enteredOtp)
-        .get();
-
-    if (snapshot.docs.isNotEmpty) {
-      var doc = snapshot.docs.first;
-      var data = doc.data();
-
-      // ✅ Check expiry
-      if (data['expiresAt'] != null &&
-          DateTime.now().isAfter(data['expiresAt'].toDate())) {
+      if (snapshot.docs.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("OTP expired")),
-        );
+            const SnackBar(content: Text("Invalid OTP")));
         return;
       }
 
-      await FirebaseFirestore.instance
-          .collection('attendance_sessions')
-          .doc(doc.id)
-          .update({
+      // Update students array
+      var docRef = snapshot.docs.first.reference;
+      await docRef.update({
         'students': FieldValue.arrayUnion([uid]),
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Attendance marked successfully")),
-      );
-    } else {
+          const SnackBar(content: Text("Attendance marked successfully")));
+    } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Invalid OTP")),
+          SnackBar(content: Text("Error submitting OTP: $e")));
+    } finally {
+      setState(() => isSubmitting = false);
+    }
+  }
+
+  Future<void> viewMonthlyAttendance() async {
+    try {
+      String uid = FirebaseAuth.instance.currentUser!.uid;
+
+      var snapshot = await FirebaseFirestore.instance
+          .collection('attendance_sessions')
+          .where('students', arrayContains: uid)
+          .orderBy('createdAt', descending: true)
+          .get();
+
+      if (snapshot.docs.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("No attendance records found")));
+        return;
+      }
+
+      // Map to AttendanceModel
+      List<AttendanceModel> sessions = snapshot.docs
+          .map((doc) => AttendanceModel.fromMap(doc.id, doc.data()))
+          .toList();
+
+      // Group by month
+      Map<String, List<DateTime>> monthly = {};
+      for (var session in sessions) {
+        if (session.createdAt == null) continue;
+        String key =
+            "${session.createdAt!.year}-${session.createdAt!.month.toString().padLeft(2, '0')}";
+        monthly.putIfAbsent(key, () => []);
+        monthly[key]!.add(session.createdAt!);
+      }
+
+      // Show dialog
+      showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text("Monthly Attendance"),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: ListView(
+              shrinkWrap: true,
+              children: monthly.entries.map((entry) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      entry.key,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                    ...entry.value.map((date) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2),
+                      child: Text(
+                          "- ${date.day}-${date.month}-${date.year}"),
+                    )),
+                    const SizedBox(height: 10),
+                  ],
+                );
+              }).toList(),
+            ),
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("Close"))
+          ],
+        ),
       );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error fetching attendance: $e")));
     }
   }
 
@@ -82,116 +137,32 @@ class _StudentScreenState extends State<StudentScreen> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            TextField(
-              controller: otpController,
-              decoration: const InputDecoration(
-                labelText: "Enter OTP",
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            ElevatedButton(
-              onPressed: verifyOTP,
-              style: ElevatedButton.styleFrom(
-                minimumSize: const Size(double.infinity, 50),
-              ),
-              child: const Text("Submit OTP"),
-            ),
-
-            const SizedBox(height: 20),
-
-            ElevatedButton(
-              onPressed: () async {
-                final user = FirebaseAuth.instance.currentUser;
-                if (user == null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("User not logged in")),
-                  );
-                  return;
-                }
-
-                String uid = user.uid;
-
-                try {
-                  // 1️⃣ Fetch all attendance sessions where student is present
-                  var snapshot = await FirebaseFirestore.instance
-                      .collection('attendance_sessions')
-                      .where('students', arrayContains: uid)
-                      .orderBy('createdAt', descending: true)
-                      .get();
-
-                  if (snapshot.docs.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("No attendance records found")),
-                    );
-                    return;
-                  }
-
-                  // 2️⃣ Group by month
-                  Map<String, List<DateTime>> monthlyAttendance = {};
-
-                  for (var doc in snapshot.docs) {
-                    DateTime? date = (doc['createdAt'] as Timestamp?)?.toDate();
-                    if (date != null) {
-                      String monthKey = "${date.year}-${date.month.toString().padLeft(2,'0')}";
-                      if (!monthlyAttendance.containsKey(monthKey)) {
-                        monthlyAttendance[monthKey] = [];
-                      }
-                      monthlyAttendance[monthKey]!.add(date);
-                    }
-                  }
-
-                  // 3️⃣ Show in dialog
-                  showDialog(
-                    context: context,
-                    builder: (_) => AlertDialog(
-                      title: const Text("Monthly Attendance"),
-                      content: SizedBox(
-                        width: double.maxFinite,
-                        child: ListView(
-                          shrinkWrap: true,
-                          children: monthlyAttendance.entries.map((entry) {
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  entry.key, // "2026-04"
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                                ...entry.value.map((date) => Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 2.0),
-                                  child: Text(
-                                    "- ${date.day}-${date.month}-${date.year}",
-                                  ),
-                                )),
-                                const SizedBox(height: 10),
-                              ],
-                            );
-                          }).toList(),
-                        ),
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text("Close"),
-                        ),
-                      ],
-                    ),
-                  );
-                } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text("Error: $e")),
-                  );
-                }
+            CustomButton(
+              text: "Mark Attendance",
+              onPressed: () {
+                setState(() {
+                  showOtpField = true; // Show OTP input when clicked
+                });
               },
-              style: ElevatedButton.styleFrom(
-                minimumSize: const Size(double.infinity, 50),
+            ),
+            const SizedBox(height: 20),
+            if (showOtpField) ...[
+              TextField(
+                controller: otpController,
+                decoration: const InputDecoration(
+                    labelText: "Enter OTP", border: OutlineInputBorder()),
               ),
-              child: const Text("View Attendance"),
+              const SizedBox(height: 20),
+              CustomButton(
+                text: "Submit OTP",
+                onPressed: submitOtp,
+                isLoading: isSubmitting,
+              ),
+            ],
+            const SizedBox(height: 20),
+            CustomButton(
+              text: "View Attendance",
+              onPressed: viewMonthlyAttendance,
             ),
           ],
         ),
