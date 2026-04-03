@@ -32,7 +32,7 @@ class _AnimatedMeshBackgroundState extends State<AnimatedMeshBackground>
     super.initState();
     _controllers = List.generate(
       widget.colors.length,
-          (i) => AnimationController(
+      (i) => AnimationController(
         vsync: this,
         duration: Duration(seconds: 8 + i * 3),
       )..repeat(reverse: true),

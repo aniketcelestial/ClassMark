@@ -60,9 +60,9 @@ class PresentStudentsScreen extends ConsumerWidget {
                         // Session header
                         GlassCard(
                           backgroundColor:
-                          AppTheme.accentCyan.withOpacity(0.08),
+                              AppTheme.accentCyan.withOpacity(0.08),
                           borderColor:
-                          AppTheme.accentCyan.withOpacity(0.3),
+                              AppTheme.accentCyan.withOpacity(0.3),
                           child: Row(
                             children: [
                               Container(
@@ -74,17 +74,17 @@ class PresentStudentsScreen extends ConsumerWidget {
                                 ),
                               )
                                   .animate(
-                                  onPlay: (c) => c.repeat())
+                                      onPlay: (c) => c.repeat())
                                   .scaleXY(
-                                  end: 1.6, duration: 700.ms)
+                                      end: 1.6, duration: 700.ms)
                                   .then()
                                   .scaleXY(
-                                  end: 1.0, duration: 700.ms),
+                                      end: 1.0, duration: 700.ms),
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment:
-                                  CrossAxisAlignment.start,
+                                      CrossAxisAlignment.start,
                                   children: [
                                     const Text(
                                       'Live Attendance',
@@ -131,7 +131,7 @@ class PresentStudentsScreen extends ConsumerWidget {
                                 return Expanded(
                                   child: Column(
                                     crossAxisAlignment:
-                                    CrossAxisAlignment.start,
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Row(
                                         children: [
@@ -140,7 +140,7 @@ class PresentStudentsScreen extends ConsumerWidget {
                                             style: TextStyle(
                                               fontSize: 14,
                                               color:
-                                              AppTheme.textSecondary,
+                                                  AppTheme.textSecondary,
                                             ),
                                           ),
                                           Text(
@@ -148,7 +148,7 @@ class PresentStudentsScreen extends ConsumerWidget {
                                             style: const TextStyle(
                                               fontSize: 16,
                                               fontWeight:
-                                              FontWeight.w700,
+                                                  FontWeight.w700,
                                               color: AppTheme.accentGreen,
                                             ),
                                           ),
@@ -160,8 +160,8 @@ class PresentStudentsScreen extends ConsumerWidget {
                                           itemCount: students.length,
                                           separatorBuilder:
                                               (_, __) =>
-                                          const SizedBox(
-                                              height: 10),
+                                                  const SizedBox(
+                                                      height: 10),
                                           itemBuilder: (ctx, i) {
                                             final s = students[i];
                                             return _StudentTile(
@@ -254,7 +254,7 @@ class _StudentTile extends StatelessWidget {
             children: [
               Container(
                 padding:
-                const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: AppTheme.accentGreen.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(8),

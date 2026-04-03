@@ -7,15 +7,13 @@ import '../../../core/utils/logger.dart';
 
 final otpServiceProvider = Provider<OtpService>((ref) => OtpService());
 
-// Active OTP session state
 final activeSessionProvider =
-StateNotifierProvider<ActiveSessionNotifier, OtpSession?>(
-      (ref) => ActiveSessionNotifier(ref.read(otpServiceProvider)),
+    StateNotifierProvider<ActiveSessionNotifier, OtpSession?>(
+  (ref) => ActiveSessionNotifier(ref.read(otpServiceProvider)),
 );
 
 class ActiveSessionNotifier extends StateNotifier<OtpSession?> {
   final OtpService _otpService;
-
   ActiveSessionNotifier(this._otpService) : super(null);
 
   Future<String?> generateOtp({
@@ -25,33 +23,41 @@ class ActiveSessionNotifier extends StateNotifier<OtpSession?> {
     required String className,
   }) async {
     try {
-      final position = await LocationService.getCurrentPosition();
-      if (position == null) {
-        return 'Location permission is required to generate OTP. Please enable location access.';
+      // Get location with a specific error message
+      final locResult = await LocationService.getPositionWithReason();
+      if (locResult.position == null) {
+        appLogger.e('Location failed: ${locResult.error}');
+        return locResult.error;
       }
+
+      final pos = locResult.position!;
+      appLogger.i('Creating OTP session for $teacherName at ${pos.latitude}, ${pos.longitude}');
 
       final session = await _otpService.createOtpSession(
         teacherId: teacherId,
         teacherName: teacherName,
         subject: subject,
         className: className,
-        latitude: position.latitude,
-        longitude: position.longitude,
+        latitude: pos.latitude,
+        longitude: pos.longitude,
       );
+
       state = session;
-      appLogger.i('OTP generated: ${session.otp}');
+      appLogger.i('OTP generated successfully: ${session.otp}');
       return null;
-    } catch (e) {
-      appLogger.e('Generate OTP error: $e');
-      return 'Failed to generate OTP. Please try again.';
+    } catch (e, stack) {
+      appLogger.e('Generate OTP error', error: e, stackTrace: stack);
+      return 'Error: ${e.toString()}';
     }
   }
 
   Future<void> loadActiveSession(String teacherId) async {
     try {
-      state = await _otpService.getActiveSession(teacherId);
-    } catch (e) {
-      appLogger.e('Load session error: $e');
+      final session = await _otpService.getActiveSession(teacherId);
+      appLogger.i('Loaded session: ${session?.otp ?? 'none'}');
+      state = session;
+    } catch (e, stack) {
+      appLogger.e('Load session error', error: e, stackTrace: stack);
     }
   }
 
@@ -61,15 +67,13 @@ class ActiveSessionNotifier extends StateNotifier<OtpSession?> {
       await _otpService.deactivateSession(state!.id);
       state = null;
     } catch (e) {
-      appLogger.e('Deactivate session error: $e');
+      appLogger.e('Deactivate error: $e');
     }
   }
 }
 
-// Present students stream
 final presentStudentsProvider =
-StreamProvider.family<List<AttendanceRecord>, String>(
-      (ref, sessionId) {
-    return ref.read(otpServiceProvider).getPresentStudents(sessionId);
-  },
+    StreamProvider.family<List<AttendanceRecord>, String>(
+  (ref, sessionId) =>
+      ref.read(otpServiceProvider).getPresentStudents(sessionId),
 );

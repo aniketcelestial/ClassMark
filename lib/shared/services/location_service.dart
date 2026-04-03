@@ -2,58 +2,87 @@ import 'package:geolocator/geolocator.dart';
 import '../../core/utils/logger.dart';
 
 class LocationService {
-  static Future<bool> requestPermission() async {
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+  /// Returns position or a clear error string explaining what went wrong
+  static Future<({Position? position, String? error})>
+      getPositionWithReason() async {
+    // 1. Check if GPS service is enabled
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      appLogger.w('Location services are disabled.');
-      return false;
+      return (
+        position: null,
+        error:
+            'GPS is turned off. Please enable Location Services in device Settings and try again.'
+      );
     }
 
+    // 2. Check / request permission
     LocationPermission permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        appLogger.w('Location permissions are denied.');
-        return false;
-      }
     }
-
+    if (permission == LocationPermission.denied) {
+      return (
+        position: null,
+        error:
+            'Location permission denied. Please allow location access when prompted.'
+      );
+    }
     if (permission == LocationPermission.deniedForever) {
-      appLogger.w('Location permissions are permanently denied.');
-      return false;
+      return (
+        position: null,
+        error:
+            'Location permanently denied. Go to App Settings → Permissions → Location and enable it.'
+      );
     }
 
-    return true;
+    // 3. Try to get current position
+    try {
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings: AndroidSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: const Duration(seconds: 20),
+          forceLocationManager: false,
+        ),
+      );
+      appLogger.i(
+          'Location: ${pos.latitude}, ${pos.longitude} (±${pos.accuracy.toStringAsFixed(0)}m)');
+      return (position: pos, error: null);
+    } catch (e) {
+      appLogger.w('High accuracy GPS failed: $e');
+    }
+
+    // 4. Fallback: last known position
+    try {
+      final last = await Geolocator.getLastKnownPosition();
+      if (last != null) {
+        appLogger
+            .i('Using last known: ${last.latitude}, ${last.longitude}');
+        return (position: last, error: null);
+      }
+    } catch (e) {
+      appLogger.w('Last known position error: $e');
+    }
+
+    return (
+      position: null,
+      error:
+          'Unable to get location. Ensure GPS is on and you are outdoors or near a window.'
+    );
   }
 
   static Future<Position?> getCurrentPosition() async {
-    try {
-      final hasPermission = await requestPermission();
-      if (!hasPermission) return null;
-
-      return await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 10),
-        ),
-      );
-    } catch (e) {
-      appLogger.e('Get position error: $e');
-      return null;
-    }
+    final r = await getPositionWithReason();
+    return r.position;
   }
 
-  /// Returns distance in meters between two coordinates
   static double calculateDistance({
     required double lat1,
     required double lon1,
     required double lat2,
     required double lon2,
-  }) {
-    return Geolocator.distanceBetween(lat1, lon1, lat2, lon2);
-  }
+  }) =>
+      Geolocator.distanceBetween(lat1, lon1, lat2, lon2);
 
-  /// Check if student is within [radiusMeters] of teacher
   static bool isWithinRange({
     required double teacherLat,
     required double teacherLon,
@@ -61,13 +90,12 @@ class LocationService {
     required double studentLon,
     required double radiusMeters,
   }) {
-    final distance = calculateDistance(
-      lat1: teacherLat,
-      lon1: teacherLon,
-      lat2: studentLat,
-      lon2: studentLon,
-    );
-    appLogger.i('Distance from teacher: ${distance.toStringAsFixed(2)}m');
-    return distance <= radiusMeters;
+    final d = calculateDistance(
+        lat1: teacherLat,
+        lon1: teacherLon,
+        lat2: studentLat,
+        lon2: studentLon);
+    appLogger.i('Distance from teacher: ${d.toStringAsFixed(1)}m');
+    return d <= radiusMeters;
   }
 }

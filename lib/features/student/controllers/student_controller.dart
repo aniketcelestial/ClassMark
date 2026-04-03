@@ -17,7 +17,7 @@ enum OtpSubmitResult {
 }
 
 final studentControllerProvider =
-Provider<StudentController>((ref) {
+    Provider<StudentController>((ref) {
   return StudentController(ref.read(otpServiceProvider));
 });
 

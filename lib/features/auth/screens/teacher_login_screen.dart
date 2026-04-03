@@ -59,9 +59,9 @@ class _TeacherLoginScreenState extends ConsumerState<TeacherLoginScreen>
     if (!_loginFormKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
     final error = await ref.read(currentUserProvider.notifier).signIn(
-      email: _emailCtrl.text,
-      password: _passwordCtrl.text,
-    );
+          email: _emailCtrl.text,
+          password: _passwordCtrl.text,
+        );
     setState(() => _isLoading = false);
     if (!mounted) return;
     if (error != null) {
@@ -75,13 +75,13 @@ class _TeacherLoginScreenState extends ConsumerState<TeacherLoginScreen>
     if (!_signupFormKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
     final error = await ref.read(currentUserProvider.notifier).signUp(
-      email: _signupEmailCtrl.text,
-      password: _signupPasswordCtrl.text,
-      name: _nameCtrl.text,
-      role: 'teacher',
-      subject: _subjectCtrl.text,
-      className: _classCtrl.text,
-    );
+          email: _signupEmailCtrl.text,
+          password: _signupPasswordCtrl.text,
+          name: _nameCtrl.text,
+          role: 'teacher',
+          subject: _subjectCtrl.text,
+          className: _classCtrl.text,
+        );
     setState(() => _isLoading = false);
     if (!mounted) return;
     if (error != null) {
@@ -327,7 +327,7 @@ class _TeacherLoginScreenState extends ConsumerState<TeacherLoginScreen>
               controller: _nameCtrl,
               textInputAction: TextInputAction.next,
               validator: (v) =>
-              v == null || v.isEmpty ? 'Name is required' : null,
+                  v == null || v.isEmpty ? 'Name is required' : null,
             ),
             const SizedBox(height: 14),
             ClassMarkTextField(
@@ -364,7 +364,7 @@ class _TeacherLoginScreenState extends ConsumerState<TeacherLoginScreen>
               controller: _subjectCtrl,
               textInputAction: TextInputAction.next,
               validator: (v) =>
-              v == null || v.isEmpty ? 'Subject is required' : null,
+                  v == null || v.isEmpty ? 'Subject is required' : null,
             ),
             const SizedBox(height: 14),
             ClassMarkTextField(
@@ -374,7 +374,7 @@ class _TeacherLoginScreenState extends ConsumerState<TeacherLoginScreen>
               controller: _classCtrl,
               textInputAction: TextInputAction.done,
               validator: (v) =>
-              v == null || v.isEmpty ? 'Class is required' : null,
+                  v == null || v.isEmpty ? 'Class is required' : null,
             ),
             const SizedBox(height: 20),
             GradientButton(
@@ -397,7 +397,7 @@ class _TeacherLoginScreenState extends ConsumerState<TeacherLoginScreen>
       builder: (ctx) => AlertDialog(
         backgroundColor: AppTheme.bgCard,
         shape:
-        RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('Reset Password',
             style: TextStyle(color: AppTheme.textPrimary)),
         content: ClassMarkTextField(
@@ -421,7 +421,7 @@ class _TeacherLoginScreenState extends ConsumerState<TeacherLoginScreen>
                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                   content: Text(error ?? 'Reset email sent!'),
                   backgroundColor:
-                  error != null ? AppTheme.errorRed : AppTheme.accentGreen,
+                      error != null ? AppTheme.errorRed : AppTheme.accentGreen,
                   behavior: SnackBarBehavior.floating,
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12)),

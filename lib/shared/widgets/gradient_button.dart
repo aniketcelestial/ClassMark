@@ -45,54 +45,54 @@ class _GradientButtonState extends State<GradientButton> {
           decoration: BoxDecoration(
             gradient: widget.onPressed == null
                 ? LinearGradient(
-                colors: widget.colors
-                    .map((c) => c.withOpacity(0.4))
-                    .toList())
+                    colors: widget.colors
+                        .map((c) => c.withOpacity(0.4))
+                        .toList())
                 : LinearGradient(
-              colors: widget.colors,
-              begin: Alignment.centerLeft,
-              end: Alignment.centerRight,
-            ),
+                    colors: widget.colors,
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                  ),
             borderRadius: BorderRadius.circular(widget.borderRadius),
             boxShadow: widget.onPressed != null
                 ? [
-              BoxShadow(
-                color: widget.colors.first.withOpacity(0.4),
-                blurRadius: 16,
-                offset: const Offset(0, 6),
-              ),
-            ]
+                    BoxShadow(
+                      color: widget.colors.first.withOpacity(0.4),
+                      blurRadius: 16,
+                      offset: const Offset(0, 6),
+                    ),
+                  ]
                 : null,
           ),
           child: Center(
             child: widget.isLoading
                 ? const SizedBox(
-              width: 22,
-              height: 22,
-              child: CircularProgressIndicator(
-                color: Colors.white,
-                strokeWidth: 2.5,
-              ),
-            )
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2.5,
+                    ),
+                  )
                 : Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (widget.icon != null) ...[
-                  Icon(widget.icon,
-                      color: Colors.white, size: 20),
-                  const SizedBox(width: 8),
-                ],
-                Text(
-                  widget.label,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.5,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (widget.icon != null) ...[
+                        Icon(widget.icon,
+                            color: Colors.white, size: 20),
+                        const SizedBox(width: 8),
+                      ],
+                      Text(
+                        widget.label,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
-            ),
           ),
         ),
       ),

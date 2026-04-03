@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -20,8 +19,10 @@ class GenerateOtpScreen extends ConsumerStatefulWidget {
 
 class _GenerateOtpScreenState extends ConsumerState<GenerateOtpScreen> {
   bool _isGenerating = false;
+  String _loadingStep = '';
   Timer? _countdownTimer;
   int _secondsLeft = 0;
+  String? _lastError;
 
   @override
   void initState() {
@@ -40,15 +41,10 @@ class _GenerateOtpScreenState extends ConsumerState<GenerateOtpScreen> {
 
   void _startCountdown(DateTime expiresAt) {
     _countdownTimer?.cancel();
-    _secondsLeft = expiresAt.difference(DateTime.now()).inSeconds;
-    if (_secondsLeft <= 0) return;
-
+    _secondsLeft = expiresAt.difference(DateTime.now()).inSeconds.clamp(0, 999);
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       final left = expiresAt.difference(DateTime.now()).inSeconds;
-      if (!mounted) {
-        timer.cancel();
-        return;
-      }
+      if (!mounted) { timer.cancel(); return; }
       setState(() => _secondsLeft = left < 0 ? 0 : left);
       if (left <= 0) {
         timer.cancel();
@@ -61,25 +57,38 @@ class _GenerateOtpScreenState extends ConsumerState<GenerateOtpScreen> {
     final user = ref.read(currentUserProvider);
     if (user == null) return;
 
-    setState(() => _isGenerating = true);
+    setState(() {
+      _isGenerating = true;
+      _lastError = null;
+      _loadingStep = 'Requesting location permission...';
+    });
+
+    // Small delay so user sees the step message
+    await Future.delayed(const Duration(milliseconds: 300));
+    if (!mounted) return;
+    setState(() => _loadingStep = 'Getting your GPS coordinates...');
+
     final error = await ref.read(activeSessionProvider.notifier).generateOtp(
-      teacherId: user.uid,
-      teacherName: user.name,
-      subject: user.subject ?? 'General',
-      className: user.className ?? 'Class',
-    );
-    setState(() => _isGenerating = false);
+          teacherId: user.uid,
+          teacherName: user.name,
+          subject: user.subject ?? 'General',
+          className: user.className ?? 'Class',
+        );
 
     if (!mounted) return;
+
     if (error != null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(error),
-        backgroundColor: AppTheme.errorRed,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        margin: const EdgeInsets.all(16),
-      ));
+      setState(() {
+        _isGenerating = false;
+        _loadingStep = '';
+        _lastError = error;
+      });
     } else {
+      setState(() {
+        _isGenerating = false;
+        _loadingStep = '';
+        _lastError = null;
+      });
       final session = ref.read(activeSessionProvider);
       if (session != null) _startCountdown(session.expiresAt);
     }
@@ -91,12 +100,14 @@ class _GenerateOtpScreenState extends ConsumerState<GenerateOtpScreen> {
     return '$m:$s';
   }
 
-  double get _timerProgress => _secondsLeft / (10 * 60); // 10 min total
+  double get _timerProgress =>
+      (_secondsLeft / (10 * 60)).clamp(0.0, 1.0);
 
   @override
   Widget build(BuildContext context) {
     final session = ref.watch(activeSessionProvider);
-    final hasActiveSession = session != null && !session.isExpired && _secondsLeft > 0;
+    final hasActive =
+        session != null && !session.isExpired && _secondsLeft > 0;
 
     return Scaffold(
       body: AnimatedMeshBackground(
@@ -104,7 +115,6 @@ class _GenerateOtpScreenState extends ConsumerState<GenerateOtpScreen> {
         child: SafeArea(
           child: Column(
             children: [
-              // App Bar
               Padding(
                 padding: const EdgeInsets.fromLTRB(8, 12, 24, 0),
                 child: Row(
@@ -119,10 +129,9 @@ class _GenerateOtpScreenState extends ConsumerState<GenerateOtpScreen> {
                         'Generate OTP',
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.textPrimary,
-                        ),
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.textPrimary),
                       ),
                     ),
                     const SizedBox(width: 48),
@@ -131,74 +140,138 @@ class _GenerateOtpScreenState extends ConsumerState<GenerateOtpScreen> {
               ),
               Expanded(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 24, vertical: 16),
                   child: Column(
                     children: [
-                      const SizedBox(height: 32),
-                      if (hasActiveSession) ...[
-                        // OTP Display
+                      const SizedBox(height: 16),
+
+                      // ── Error banner ──────────────────────────────
+                      if (_lastError != null)
+                        GlassCard(
+                          backgroundColor:
+                              AppTheme.errorRed.withOpacity(0.12),
+                          borderColor:
+                              AppTheme.errorRed.withOpacity(0.4),
+                          padding: const EdgeInsets.all(16),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Icon(Icons.error_outline_rounded,
+                                  color: AppTheme.errorRed, size: 22),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  _lastError!,
+                                  style: const TextStyle(
+                                      fontSize: 13,
+                                      color: AppTheme.errorRed,
+                                      height: 1.5),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ).animate().fadeIn().slideY(begin: -0.1),
+
+                      if (_lastError != null) const SizedBox(height: 20),
+
+                      // ── Active session ────────────────────────────
+                      if (hasActive) ...[
                         _OtpDisplay(
                           otp: session.otp,
                           timerDisplay: _timerDisplay,
                           timerProgress: _timerProgress,
                           secondsLeft: _secondsLeft,
                         ),
-                        const SizedBox(height: 24),
-                        // Session info
+                        const SizedBox(height: 20),
                         GlassCard(
                           child: Column(
                             children: [
-                              _SessionInfo(
-                                  icon: Icons.book_outlined,
-                                  label: 'Subject',
-                                  value: session.subject),
+                              _Row(Icons.book_outlined, 'Subject',
+                                  session.subject),
                               const Divider(color: AppTheme.glassBorder),
-                              _SessionInfo(
-                                  icon: Icons.groups_outlined,
-                                  label: 'Class',
-                                  value: session.className),
+                              _Row(Icons.groups_outlined, 'Class',
+                                  session.className),
                               const Divider(color: AppTheme.glassBorder),
-                              _SessionInfo(
-                                  icon: Icons.location_on_outlined,
-                                  label: 'Location',
-                                  value:
-                                  '${session.teacherLatitude.toStringAsFixed(4)}, ${session.teacherLongitude.toStringAsFixed(4)}'),
+                              _Row(
+                                Icons.location_on_outlined,
+                                'Location',
+                                '${session.teacherLatitude.toStringAsFixed(5)},\n${session.teacherLongitude.toStringAsFixed(5)}',
+                              ),
                             ],
                           ),
                         ).animate().fadeIn(delay: 200.ms),
                         const SizedBox(height: 20),
-                        // Stop session
                         GradientButton(
                           label: 'Stop Session',
-                          colors: [AppTheme.errorRed, const Color(0xFFFF6B6B)],
+                          colors: [
+                            AppTheme.errorRed,
+                            const Color(0xFFFF6B6B)
+                          ],
                           icon: Icons.stop_circle_outlined,
                           onPressed: () async {
                             _countdownTimer?.cancel();
                             await ref
                                 .read(activeSessionProvider.notifier)
                                 .deactivateSession();
+                            setState(() => _secondsLeft = 0);
                           },
                         ),
                       ] else ...[
-                        // No active session
-                        const SizedBox(height: 40),
-                        _NoSessionPlaceholder(),
-                        const SizedBox(height: 40),
+                        // ── No session ────────────────────────────
+                        const SizedBox(height: 30),
+                        _NoSessionPlaceholder(isLoading: _isGenerating),
+                        const SizedBox(height: 32),
+
+                        // Loading step indicator
+                        if (_isGenerating)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 20),
+                            child: Column(
+                              children: [
+                                const CircularProgressIndicator(
+                                    color: AppTheme.primaryBlue,
+                                    strokeWidth: 2.5),
+                                const SizedBox(height: 14),
+                                Text(
+                                  _loadingStep,
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                      fontSize: 13,
+                                      color: AppTheme.textSecondary),
+                                ),
+                              ],
+                            ),
+                          ),
+
                         GradientButton(
-                          label: 'Generate OTP Session',
+                          label: _isGenerating
+                              ? 'Getting Location...'
+                              : 'Generate OTP Session',
                           colors: AppTheme.teacherGradient,
-                          icon: Icons.generating_tokens_rounded,
+                          icon: _isGenerating
+                              ? null
+                              : Icons.generating_tokens_rounded,
                           isLoading: _isGenerating,
                           onPressed: _isGenerating ? null : _generateOtp,
                         ),
                         const SizedBox(height: 16),
-                        const Text(
-                          'Your current location will be captured.\nStudents within 20m can mark attendance.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: AppTheme.textMuted,
-                            height: 1.6,
+                        GlassCard(
+                          padding: const EdgeInsets.all(14),
+                          child: Column(
+                            children: const [
+                              _InfoRow(
+                                  Icons.location_on_outlined,
+                                  'Your GPS location is captured when OTP is generated'),
+                              SizedBox(height: 8),
+                              _InfoRow(
+                                  Icons.radar_rounded,
+                                  'Students must be within 20 metres to mark attendance'),
+                              SizedBox(height: 8),
+                              _InfoRow(
+                                  Icons.timer_outlined,
+                                  'OTP expires automatically after 10 minutes'),
+                            ],
                           ),
                         ),
                       ],
@@ -214,6 +287,8 @@ class _GenerateOtpScreenState extends ConsumerState<GenerateOtpScreen> {
     );
   }
 }
+
+// ─── Sub-widgets ────────────────────────────────────────────────────────────
 
 class _OtpDisplay extends StatelessWidget {
   final String otp;
@@ -231,7 +306,6 @@ class _OtpDisplay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isUrgent = secondsLeft < 60;
-
     return GlassCard(
       backgroundColor: const Color(0x1A4F9DFF),
       borderColor: AppTheme.primaryBlue.withOpacity(0.4),
@@ -240,54 +314,13 @@ class _OtpDisplay extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Session OTP',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: AppTheme.textSecondary,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              Container(
-                padding:
-                const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppTheme.accentGreen.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                      color: AppTheme.accentGreen.withOpacity(0.3)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: AppTheme.accentGreen),
-                    )
-                        .animate(onPlay: (c) => c.repeat())
-                        .scaleXY(end: 1.6, duration: 700.ms)
-                        .then()
-                        .scaleXY(end: 1.0, duration: 700.ms),
-                    const SizedBox(width: 5),
-                    const Text(
-                      'LIVE',
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: AppTheme.accentGreen,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 1,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              const Text('Session OTP',
+                  style: TextStyle(
+                      fontSize: 13, color: AppTheme.textSecondary)),
+              _LiveBadge(),
             ],
           ),
           const SizedBox(height: 20),
-          // OTP digits
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: otp.split('').map((digit) {
@@ -300,59 +333,46 @@ class _OtpDisplay extends StatelessWidget {
                     colors: AppTheme.teacherGradient
                         .map((c) => c.withOpacity(0.2))
                         .toList(),
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
                   ),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
                       color: AppTheme.primaryBlue.withOpacity(0.4)),
                 ),
                 child: Center(
-                  child: Text(
-                    digit,
-                    style: const TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.w800,
-                      color: AppTheme.textPrimary,
-                      letterSpacing: 0,
-                    ),
-                  ),
+                  child: Text(digit,
+                      style: const TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.textPrimary)),
                 ),
               );
             }).toList(),
           ),
           const SizedBox(height: 20),
-          // Timer
           Row(
             children: [
-              Icon(
-                Icons.timer_outlined,
-                color:
-                isUrgent ? AppTheme.errorRed : AppTheme.textSecondary,
-                size: 16,
-              ),
+              Icon(Icons.timer_outlined,
+                  color: isUrgent
+                      ? AppTheme.errorRed
+                      : AppTheme.textSecondary,
+                  size: 16),
               const SizedBox(width: 6),
               Text(
                 'Expires in $timerDisplay',
                 style: TextStyle(
-                  fontSize: 13,
-                  color: isUrgent
-                      ? AppTheme.errorRed
-                      : AppTheme.textSecondary,
-                  fontWeight: FontWeight.w500,
-                ),
+                    fontSize: 13,
+                    color: isUrgent
+                        ? AppTheme.errorRed
+                        : AppTheme.textSecondary),
               ),
               const Spacer(),
-              // Copy button
               GestureDetector(
                 onTap: () {
                   Clipboard.setData(ClipboardData(text: otp));
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('OTP copied!'),
-                      duration: Duration(seconds: 1),
-                    ),
-                  );
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                    content: Text('OTP copied!'),
+                    duration: Duration(seconds: 1),
+                  ));
                 },
                 child: Container(
                   padding: const EdgeInsets.symmetric(
@@ -368,13 +388,10 @@ class _OtpDisplay extends StatelessWidget {
                       Icon(Icons.copy_rounded,
                           color: AppTheme.textSecondary, size: 13),
                       SizedBox(width: 4),
-                      Text(
-                        'Copy',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppTheme.textSecondary,
-                        ),
-                      ),
+                      Text('Copy',
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.textSecondary)),
                     ],
                   ),
                 ),
@@ -395,51 +412,85 @@ class _OtpDisplay extends StatelessWidget {
           ),
         ],
       ),
-    ).animate().fadeIn(duration: 500.ms).scale(
-        begin: const Offset(0.95, 0.95), curve: Curves.elasticOut);
+    ).animate().fadeIn(duration: 500.ms);
+  }
+}
+
+class _LiveBadge extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppTheme.accentGreen.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppTheme.accentGreen.withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6, height: 6,
+            decoration: const BoxDecoration(
+                shape: BoxShape.circle, color: AppTheme.accentGreen),
+          )
+              .animate(onPlay: (c) => c.repeat())
+              .scaleXY(end: 1.6, duration: 700.ms)
+              .then()
+              .scaleXY(end: 1.0, duration: 700.ms),
+          const SizedBox(width: 5),
+          const Text('LIVE',
+              style: TextStyle(
+                  fontSize: 10,
+                  color: AppTheme.accentGreen,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1)),
+        ],
+      ),
+    );
   }
 }
 
 class _NoSessionPlaceholder extends StatelessWidget {
+  final bool isLoading;
+  const _NoSessionPlaceholder({required this.isLoading});
+
   @override
   Widget build(BuildContext context) {
     return GlassCard(
       child: Column(
         children: [
           Container(
-            width: 80,
-            height: 80,
+            width: 80, height: 80,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: AppTheme.primaryBlue.withOpacity(0.1),
               border: Border.all(
                   color: AppTheme.primaryBlue.withOpacity(0.2)),
             ),
-            child: const Icon(
-              Icons.generating_tokens_rounded,
-              color: AppTheme.primaryBlue,
-              size: 36,
-            ),
-          ).animate(onPlay: (c) => c.repeat(reverse: true))
+            child: const Icon(Icons.generating_tokens_rounded,
+                color: AppTheme.primaryBlue, size: 36),
+          )
+              .animate(onPlay: (c) => c.repeat(reverse: true))
               .scaleXY(end: 1.08, duration: 2000.ms, curve: Curves.easeInOut),
           const SizedBox(height: 20),
           const Text(
             'No Active Session',
             style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: AppTheme.textPrimary,
-            ),
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: AppTheme.textPrimary),
           ),
           const SizedBox(height: 8),
-          const Text(
-            'Generate an OTP to start an attendance session.\nStudents nearby can then mark their presence.',
+          Text(
+            isLoading
+                ? 'Fetching your location — this may take up to 20 seconds...'
+                : 'Tap the button below to start an attendance session.\nMake sure GPS / Location is enabled.',
             textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 13,
-              color: AppTheme.textSecondary,
-              height: 1.6,
-            ),
+            style: const TextStyle(
+                fontSize: 13,
+                color: AppTheme.textSecondary,
+                height: 1.6),
           ),
         ],
       ),
@@ -447,19 +498,18 @@ class _NoSessionPlaceholder extends StatelessWidget {
   }
 }
 
-class _SessionInfo extends StatelessWidget {
+class _Row extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
-
-  const _SessionInfo(
-      {required this.icon, required this.label, required this.value});
+  const _Row(this.icon, this.label, this.value);
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(icon, color: AppTheme.primaryBlue, size: 18),
           const SizedBox(width: 12),
@@ -467,13 +517,40 @@ class _SessionInfo extends StatelessWidget {
               style: const TextStyle(
                   color: AppTheme.textSecondary, fontSize: 13)),
           const Spacer(),
-          Text(value,
-              style: const TextStyle(
-                  color: AppTheme.textPrimary,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600)),
+          Flexible(
+            child: Text(value,
+                textAlign: TextAlign.right,
+                style: const TextStyle(
+                    color: AppTheme.textPrimary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600)),
+          ),
         ],
       ),
+    );
+  }
+}
+
+class _InfoRow extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  const _InfoRow(this.icon, this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, color: AppTheme.primaryBlue, size: 15),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(text,
+              style: const TextStyle(
+                  fontSize: 12,
+                  color: AppTheme.textSecondary,
+                  height: 1.4)),
+        ),
+      ],
     );
   }
 }

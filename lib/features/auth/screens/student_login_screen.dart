@@ -56,9 +56,9 @@ class _StudentLoginScreenState extends ConsumerState<StudentLoginScreen>
     if (!_loginFormKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
     final error = await ref.read(currentUserProvider.notifier).signIn(
-      email: _emailCtrl.text,
-      password: _passwordCtrl.text,
-    );
+          email: _emailCtrl.text,
+          password: _passwordCtrl.text,
+        );
     setState(() => _isLoading = false);
     if (!mounted) return;
     if (error != null) {
@@ -72,13 +72,13 @@ class _StudentLoginScreenState extends ConsumerState<StudentLoginScreen>
     if (!_signupFormKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
     final error = await ref.read(currentUserProvider.notifier).signUp(
-      email: _signupEmailCtrl.text,
-      password: _signupPasswordCtrl.text,
-      name: _nameCtrl.text,
-      role: 'student',
-      rollNumber: _rollCtrl.text,
-      className: _classCtrl.text,
-    );
+          email: _signupEmailCtrl.text,
+          password: _signupPasswordCtrl.text,
+          name: _nameCtrl.text,
+          role: 'student',
+          rollNumber: _rollCtrl.text,
+          className: _classCtrl.text,
+        );
     setState(() => _isLoading = false);
     if (!mounted) return;
     if (error != null) {
@@ -298,7 +298,7 @@ class _StudentLoginScreenState extends ConsumerState<StudentLoginScreen>
               controller: _nameCtrl,
               textInputAction: TextInputAction.next,
               validator: (v) =>
-              v == null || v.isEmpty ? 'Name is required' : null,
+                  v == null || v.isEmpty ? 'Name is required' : null,
             ),
             const SizedBox(height: 14),
             ClassMarkTextField(
@@ -335,7 +335,7 @@ class _StudentLoginScreenState extends ConsumerState<StudentLoginScreen>
               controller: _rollCtrl,
               textInputAction: TextInputAction.next,
               validator: (v) =>
-              v == null || v.isEmpty ? 'Roll number is required' : null,
+                  v == null || v.isEmpty ? 'Roll number is required' : null,
             ),
             const SizedBox(height: 14),
             ClassMarkTextField(
@@ -345,7 +345,7 @@ class _StudentLoginScreenState extends ConsumerState<StudentLoginScreen>
               controller: _classCtrl,
               textInputAction: TextInputAction.done,
               validator: (v) =>
-              v == null || v.isEmpty ? 'Class is required' : null,
+                  v == null || v.isEmpty ? 'Class is required' : null,
             ),
             const SizedBox(height: 20),
             GradientButton(

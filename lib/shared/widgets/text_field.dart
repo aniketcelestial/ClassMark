@@ -51,18 +51,18 @@ class _ClassMarkTextFieldState extends State<ClassMarkTextField> {
         hintText: widget.hint,
         prefixIcon: widget.prefixIcon != null
             ? Icon(widget.prefixIcon,
-            color: AppTheme.textMuted, size: 20)
+                color: AppTheme.textMuted, size: 20)
             : null,
         suffixIcon: widget.isPassword
             ? IconButton(
-          icon: Icon(
-            _obscureText ? Icons.visibility_off : Icons.visibility,
-            color: AppTheme.textMuted,
-            size: 20,
-          ),
-          onPressed: () =>
-              setState(() => _obscureText = !_obscureText),
-        )
+                icon: Icon(
+                  _obscureText ? Icons.visibility_off : Icons.visibility,
+                  color: AppTheme.textMuted,
+                  size: 20,
+                ),
+                onPressed: () =>
+                    setState(() => _obscureText = !_obscureText),
+              )
             : null,
       ),
     );

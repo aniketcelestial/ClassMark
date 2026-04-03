@@ -48,10 +48,10 @@ class _EnterOtpScreenState extends ConsumerState<EnterOtpScreen> {
     final result = await ref
         .read(studentControllerProvider)
         .submitOtp(
-      otp: _otp,
-      studentId: user.uid,
-      studentName: user.name,
-    );
+          otp: _otp,
+          studentId: user.uid,
+          studentName: user.name,
+        );
 
     setState(() {
       _isLoading = false;
@@ -153,11 +153,11 @@ class _EnterOtpScreenState extends ConsumerState<EnterOtpScreen> {
                         ),
                       )
                           .animate(
-                          onPlay: (c) => c.repeat(reverse: true))
+                              onPlay: (c) => c.repeat(reverse: true))
                           .scaleXY(
-                          end: 1.08,
-                          duration: 2000.ms,
-                          curve: Curves.easeInOut)
+                              end: 1.08,
+                              duration: 2000.ms,
+                              curve: Curves.easeInOut)
                           .animate()
                           .fadeIn(duration: 400.ms),
                       const SizedBox(height: 24),
@@ -192,17 +192,17 @@ class _EnterOtpScreenState extends ConsumerState<EnterOtpScreen> {
                           keyboardType: TextInputType.number,
                           animationType: AnimationType.scale,
                           animationDuration:
-                          const Duration(milliseconds: 200),
+                              const Duration(milliseconds: 200),
                           pinTheme: PinTheme(
                             shape: PinCodeFieldShape.box,
                             borderRadius: BorderRadius.circular(12),
                             fieldHeight: 58,
                             fieldWidth: 46,
                             activeFillColor:
-                            AppTheme.accentCyan.withOpacity(0.15),
+                                AppTheme.accentCyan.withOpacity(0.15),
                             inactiveFillColor: AppTheme.glassWhite,
                             selectedFillColor:
-                            AppTheme.accentCyan.withOpacity(0.1),
+                                AppTheme.accentCyan.withOpacity(0.1),
                             activeColor: AppTheme.accentCyan,
                             inactiveColor: AppTheme.glassBorder,
                             selectedColor: AppTheme.accentCyan,
@@ -220,17 +220,17 @@ class _EnterOtpScreenState extends ConsumerState<EnterOtpScreen> {
                       if (_lastResult != null)
                         GlassCard(
                           backgroundColor:
-                          _resultColor(_lastResult!).withOpacity(0.1),
+                              _resultColor(_lastResult!).withOpacity(0.1),
                           borderColor:
-                          _resultColor(_lastResult!).withOpacity(0.3),
+                              _resultColor(_lastResult!).withOpacity(0.3),
                           padding: const EdgeInsets.symmetric(
                               horizontal: 20, vertical: 14),
                           child: Row(
                             children: [
                               Icon(
                                 _lastResult == OtpSubmitResult.success ||
-                                    _lastResult ==
-                                        OtpSubmitResult.alreadyMarked
+                                        _lastResult ==
+                                            OtpSubmitResult.alreadyMarked
                                     ? Icons.check_circle_rounded
                                     : Icons.error_outline_rounded,
                                 color: _resultColor(_lastResult!),
@@ -263,9 +263,9 @@ class _EnterOtpScreenState extends ConsumerState<EnterOtpScreen> {
                       if (_lastResult == OtpSubmitResult.success) ...[
                         GlassCard(
                           backgroundColor:
-                          AppTheme.accentGreen.withOpacity(0.1),
+                              AppTheme.accentGreen.withOpacity(0.1),
                           borderColor:
-                          AppTheme.accentGreen.withOpacity(0.3),
+                              AppTheme.accentGreen.withOpacity(0.3),
                           child: Column(
                             children: [
                               const Icon(
@@ -275,8 +275,8 @@ class _EnterOtpScreenState extends ConsumerState<EnterOtpScreen> {
                               )
                                   .animate()
                                   .scale(
-                                  begin: const Offset(0.5, 0.5),
-                                  curve: Curves.elasticOut)
+                                      begin: const Offset(0.5, 0.5),
+                                      curve: Curves.elasticOut)
                                   .fadeIn(),
                               const SizedBox(height: 12),
                               const Text(

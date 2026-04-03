@@ -82,7 +82,7 @@ class _TeacherDashboardScreenState
                           Navigator.pushNamedAndRemoveUntil(
                             context,
                             AppRoutes.roleSelect,
-                                (route) => false,
+                            (route) => false,
                           );
                         }
                       },
@@ -151,7 +151,7 @@ class _TeacherDashboardScreenState
                       _ActionCard(
                         title: 'Generate OTP',
                         description:
-                        'Create a proximity-locked attendance session for your class',
+                            'Create a proximity-locked attendance session for your class',
                         icon: Icons.generating_tokens_rounded,
                         colors: AppTheme.teacherGradient,
                         badge: activeSession != null ? 'ACTIVE' : null,
@@ -167,7 +167,7 @@ class _TeacherDashboardScreenState
                       _ActionCard(
                         title: 'Present Students',
                         description:
-                        'View students who have marked attendance in the active session',
+                            'View students who have marked attendance in the active session',
                         icon: Icons.how_to_reg_rounded,
                         colors: [
                           AppTheme.accentCyan,
@@ -181,7 +181,7 @@ class _TeacherDashboardScreenState
                           context,
                           MaterialPageRoute(
                               builder: (_) =>
-                              const PresentStudentsScreen()),
+                                  const PresentStudentsScreen()),
                         ),
                         delay: 400,
                       ),
@@ -213,15 +213,15 @@ class _TeacherDashboardScreenState
                             _InfoRow(
                                 icon: Icons.location_on_rounded,
                                 text:
-                                'Your location is captured when OTP is generated'),
+                                    'Your location is captured when OTP is generated'),
                             _InfoRow(
                                 icon: Icons.radar_rounded,
                                 text:
-                                'Students must be within 20m radius to mark attendance'),
+                                    'Students must be within 20m radius to mark attendance'),
                             _InfoRow(
                                 icon: Icons.timer_rounded,
                                 text:
-                                'OTP expires after 10 minutes automatically'),
+                                    'OTP expires after 10 minutes automatically'),
                           ],
                         ),
                       ).animate(delay: 500.ms).fadeIn(),
@@ -392,7 +392,7 @@ class _ActionCardState extends State<_ActionCard> {
                               borderRadius: BorderRadius.circular(6),
                               border: Border.all(
                                   color:
-                                  widget.badgeColor!.withOpacity(0.4)),
+                                      widget.badgeColor!.withOpacity(0.4)),
                             ),
                             child: Text(
                               widget.badge!,

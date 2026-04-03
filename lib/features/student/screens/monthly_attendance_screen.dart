@@ -10,16 +10,6 @@ import '../../../shared/widgets/glass_card.dart';
 import '../../auth/controllers/auth_controller.dart';
 import '../../teacher/controllers/teacher_controller.dart';
 
-final monthlyAttendanceProvider = FutureProvider.family<
-    List<AttendanceRecord>, ({String studentId, DateTime month})>(
-      (ref, params) async {
-    return ref.read(otpServiceProvider).getStudentMonthlyAttendance(
-      studentId: params.studentId,
-      month: params.month,
-    );
-  },
-);
-
 class MonthlyAttendanceScreen extends ConsumerStatefulWidget {
   const MonthlyAttendanceScreen({super.key});
 
@@ -31,12 +21,49 @@ class MonthlyAttendanceScreen extends ConsumerStatefulWidget {
 class _MonthlyAttendanceScreenState
     extends ConsumerState<MonthlyAttendanceScreen> {
   DateTime _selectedMonth = DateTime.now();
+  List<AttendanceRecord> _records = [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAttendance();
+  }
+
+  Future<void> _loadAttendance() async {
+    final user = ref.read(currentUserProvider);
+    if (user == null) {
+      setState(() { _loading = false; _error = 'Not logged in.'; });
+      return;
+    }
+
+    setState(() { _loading = true; _error = null; });
+
+    try {
+      final service = ref.read(otpServiceProvider);
+      final records = await service.getStudentMonthlyAttendance(
+        studentId: user.uid,
+        month: _selectedMonth,
+      );
+      if (mounted) {
+        setState(() { _records = records; _loading = false; });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _loading = false;
+        });
+      }
+    }
+  }
 
   void _previousMonth() {
     setState(() {
-      _selectedMonth =
-          DateTime(_selectedMonth.year, _selectedMonth.month - 1);
+      _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month - 1);
     });
+    _loadAttendance();
   }
 
   void _nextMonth() {
@@ -45,30 +72,27 @@ class _MonthlyAttendanceScreenState
         (_selectedMonth.year == now.year &&
             _selectedMonth.month < now.month)) {
       setState(() {
-        _selectedMonth =
-            DateTime(_selectedMonth.year, _selectedMonth.month + 1);
+        _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1);
       });
+      _loadAttendance();
     }
+  }
+
+  bool get _isCurrentMonth {
+    final now = DateTime.now();
+    return _selectedMonth.year == now.year &&
+        _selectedMonth.month == now.month;
   }
 
   @override
   Widget build(BuildContext context) {
-    final user = ref.watch(currentUserProvider);
-    if (user == null) return const Scaffold();
-
-    final attendanceAsync = ref.watch(monthlyAttendanceProvider(
-        (studentId: user.uid, month: _selectedMonth)));
-
-    final isCurrentMonth = _selectedMonth.year == DateTime.now().year &&
-        _selectedMonth.month == DateTime.now().month;
-
     return Scaffold(
       body: AnimatedMeshBackground(
         colors: const [AppTheme.primaryPurple, AppTheme.primaryBlue],
         child: SafeArea(
           child: Column(
             children: [
-              // App bar
+              // AppBar
               Padding(
                 padding: const EdgeInsets.fromLTRB(8, 12, 24, 0),
                 child: Row(
@@ -83,161 +107,116 @@ class _MonthlyAttendanceScreenState
                         'My Attendance',
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.textPrimary,
-                        ),
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.textPrimary),
                       ),
                     ),
-                    const SizedBox(width: 48),
+                    // Refresh button
+                    IconButton(
+                      icon: const Icon(Icons.refresh_rounded,
+                          color: AppTheme.textSecondary),
+                      onPressed: _loading ? null : _loadAttendance,
+                    ),
                   ],
                 ),
               ),
+
               Expanded(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: Column(
                     children: [
                       const SizedBox(height: 20),
+
                       // Month selector
                       GlassCard(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 12),
+                            horizontal: 8, vertical: 8),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             IconButton(
-                              onPressed: _previousMonth,
-                              icon: const Icon(
-                                  Icons.chevron_left_rounded,
+                              onPressed: _loading ? null : _previousMonth,
+                              icon: const Icon(Icons.chevron_left_rounded,
                                   color: AppTheme.textPrimary),
                             ),
                             Text(
-                              DateFormat('MMMM yyyy')
-                                  .format(_selectedMonth),
+                              DateFormat('MMMM yyyy').format(_selectedMonth),
                               style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
-                                color: AppTheme.textPrimary,
-                              ),
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppTheme.textPrimary),
                             ),
                             IconButton(
-                              onPressed: isCurrentMonth ? null : _nextMonth,
-                              icon: Icon(
-                                Icons.chevron_right_rounded,
-                                color: isCurrentMonth
-                                    ? AppTheme.textMuted
-                                    : AppTheme.textPrimary,
-                              ),
+                              onPressed: (_isCurrentMonth || _loading)
+                                  ? null
+                                  : _nextMonth,
+                              icon: Icon(Icons.chevron_right_rounded,
+                                  color: _isCurrentMonth
+                                      ? AppTheme.textMuted
+                                      : AppTheme.textPrimary),
                             ),
                           ],
                         ),
                       ).animate().fadeIn(duration: 400.ms),
-                      const SizedBox(height: 20),
-                      attendanceAsync.when(
-                        loading: () => const Center(
-                          child: Padding(
-                            padding: EdgeInsets.all(40),
-                            child: CircularProgressIndicator(
-                                color: AppTheme.primaryBlue),
-                          ),
-                        ),
-                        error: (e, _) => Center(
-                          child: Text('Error: $e',
-                              style:
-                              const TextStyle(color: AppTheme.errorRed)),
-                        ),
-                        data: (records) {
-                          final totalDays = DateUtils.getDaysInMonth(
-                              _selectedMonth.year, _selectedMonth.month);
-                          final presentDays = records.length;
-                          final percentage = totalDays > 0
-                              ? (presentDays / totalDays * 100)
-                              .clamp(0, 100)
-                              .toDouble()
-                              : 0.0;
 
-                          return Column(
+                      const SizedBox(height: 20),
+
+                      // Content
+                      if (_loading)
+                        const Padding(
+                          padding: EdgeInsets.all(60),
+                          child: Column(
                             children: [
-                              // Stats row
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: _StatCard(
-                                      label: 'Present',
-                                      value: '$presentDays',
-                                      color: AppTheme.accentGreen,
-                                      icon: Icons.check_circle_rounded,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: _StatCard(
-                                      label: 'Absent',
-                                      value:
-                                      '${totalDays - presentDays}',
-                                      color: AppTheme.errorRed,
-                                      icon: Icons.cancel_rounded,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: _StatCard(
-                                      label: 'Rate',
-                                      value:
-                                      '${percentage.toStringAsFixed(0)}%',
-                                      color: AppTheme.primaryBlue,
-                                      icon: Icons.pie_chart_rounded,
-                                    ),
-                                  ),
-                                ],
-                              ).animate(delay: 200.ms).fadeIn(),
-                              const SizedBox(height: 20),
-                              // Circular progress
-                              _AttendanceRing(
-                                percentage: percentage / 100,
-                                present: presentDays,
-                                total: totalDays,
-                              ).animate(delay: 300.ms).fadeIn().scale(
-                                  begin: const Offset(0.9, 0.9)),
-                              const SizedBox(height: 20),
-                              // Calendar grid
-                              _CalendarGrid(
-                                month: _selectedMonth,
-                                presentDates: records
-                                    .map((r) => r.markedAt)
-                                    .toList(),
-                              ).animate(delay: 400.ms).fadeIn(),
-                              const SizedBox(height: 20),
-                              // Recent list
-                              if (records.isNotEmpty) ...[
-                                Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: const Text(
-                                    'Recent Sessions',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w700,
-                                      color: AppTheme.textPrimary,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                ...records.reversed
-                                    .take(10)
-                                    .toList()
-                                    .asMap()
-                                    .entries
-                                    .map((e) => _AttendanceListItem(
-                                  record: e.value,
-                                  index: e.key,
-                                )),
-                              ] else
-                                _EmptyAttendance(month: _selectedMonth),
+                              CircularProgressIndicator(
+                                  color: AppTheme.primaryBlue,
+                                  strokeWidth: 2.5),
+                              SizedBox(height: 16),
+                              Text('Loading attendance...',
+                                  style: TextStyle(
+                                      color: AppTheme.textSecondary,
+                                      fontSize: 13)),
                             ],
-                          );
-                        },
-                      ),
+                          ),
+                        )
+                      else if (_error != null)
+                        GlassCard(
+                          backgroundColor:
+                              AppTheme.errorRed.withOpacity(0.1),
+                          borderColor: AppTheme.errorRed.withOpacity(0.3),
+                          child: Column(
+                            children: [
+                              const Icon(Icons.error_outline_rounded,
+                                  color: AppTheme.errorRed, size: 40),
+                              const SizedBox(height: 12),
+                              const Text('Failed to load attendance',
+                                  style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppTheme.textPrimary)),
+                              const SizedBox(height: 6),
+                              Text(_error!,
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                      fontSize: 12,
+                                      color: AppTheme.textSecondary)),
+                              const SizedBox(height: 14),
+                              TextButton(
+                                onPressed: _loadAttendance,
+                                child: const Text('Retry',
+                                    style: TextStyle(
+                                        color: AppTheme.primaryBlue)),
+                              ),
+                            ],
+                          ),
+                        ).animate().fadeIn()
+                      else
+                        _AttendanceContent(
+                          records: _records,
+                          month: _selectedMonth,
+                        ),
+
                       const SizedBox(height: 32),
                     ],
                   ),
@@ -251,44 +230,128 @@ class _MonthlyAttendanceScreenState
   }
 }
 
+// ─── Attendance content widget ────────────────────────────────────────────────
+
+class _AttendanceContent extends StatelessWidget {
+  final List<AttendanceRecord> records;
+  final DateTime month;
+
+  const _AttendanceContent({required this.records, required this.month});
+
+  @override
+  Widget build(BuildContext context) {
+    final totalDays =
+        DateUtils.getDaysInMonth(month.year, month.month);
+    final presentDays = records.length;
+    final percentage =
+        totalDays > 0 ? (presentDays / totalDays * 100).clamp(0, 100).toDouble() : 0.0;
+
+    return Column(
+      children: [
+        // Stats
+        Row(
+          children: [
+            Expanded(child: _StatCard('Present', '$presentDays',
+                AppTheme.accentGreen, Icons.check_circle_rounded)),
+            const SizedBox(width: 12),
+            Expanded(child: _StatCard('Absent', '${totalDays - presentDays}',
+                AppTheme.errorRed, Icons.cancel_rounded)),
+            const SizedBox(width: 12),
+            Expanded(child: _StatCard('Rate',
+                '${percentage.toStringAsFixed(0)}%',
+                AppTheme.primaryBlue, Icons.pie_chart_rounded)),
+          ],
+        ).animate(delay: 100.ms).fadeIn(),
+        const SizedBox(height: 20),
+
+        // Ring
+        _AttendanceRing(
+            percentage: percentage / 100,
+            present: presentDays,
+            total: totalDays)
+            .animate(delay: 200.ms)
+            .fadeIn()
+            .scale(begin: const Offset(0.9, 0.9)),
+        const SizedBox(height: 20),
+
+        // Calendar
+        _CalendarGrid(
+            month: month,
+            presentDates: records.map((r) => r.markedAt).toList())
+            .animate(delay: 300.ms)
+            .fadeIn(),
+        const SizedBox(height: 20),
+
+        // List
+        if (records.isEmpty)
+          GlassCard(
+            child: Column(
+              children: [
+                const Icon(Icons.event_busy_rounded,
+                    color: AppTheme.textMuted, size: 40),
+                const SizedBox(height: 12),
+                Text(
+                  'No attendance in ${DateFormat('MMMM').format(month)}',
+                  style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textPrimary),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Mark attendance using the OTP your teacher provides.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      fontSize: 13,
+                      color: AppTheme.textSecondary,
+                      height: 1.5),
+                ),
+              ],
+            ),
+          ).animate(delay: 400.ms).fadeIn()
+        else ...[
+          Align(
+            alignment: Alignment.centerLeft,
+            child: const Text('Recent Sessions',
+                style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimary)),
+          ),
+          const SizedBox(height: 12),
+          ...records.reversed.take(15).toList().asMap().entries.map(
+                (e) => _AttendanceListItem(record: e.value, index: e.key),
+              ),
+        ],
+      ],
+    );
+  }
+}
+
 class _StatCard extends StatelessWidget {
   final String label;
   final String value;
   final Color color;
   final IconData icon;
-
-  const _StatCard({
-    required this.label,
-    required this.value,
-    required this.color,
-    required this.icon,
-  });
+  const _StatCard(this.label, this.value, this.color, this.icon);
 
   @override
   Widget build(BuildContext context) {
     return GlassCard(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
       child: Column(
         children: [
           Icon(icon, color: color, size: 22),
           const SizedBox(height: 8),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w800,
-              color: color,
-            ),
-          ),
+          Text(value,
+              style: TextStyle(
+                  fontSize: 22, fontWeight: FontWeight.w800, color: color)),
           const SizedBox(height: 2),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 11,
-              color: AppTheme.textMuted,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
+          Text(label,
+              style: const TextStyle(
+                  fontSize: 11,
+                  color: AppTheme.textMuted,
+                  fontWeight: FontWeight.w500)),
         ],
       ),
     );
@@ -299,12 +362,8 @@ class _AttendanceRing extends StatelessWidget {
   final double percentage;
   final int present;
   final int total;
-
-  const _AttendanceRing({
-    required this.percentage,
-    required this.present,
-    required this.total,
-  });
+  const _AttendanceRing(
+      {required this.percentage, required this.present, required this.total});
 
   Color get _color {
     if (percentage >= 0.75) return AppTheme.accentGreen;
@@ -318,8 +377,7 @@ class _AttendanceRing extends StatelessWidget {
       child: Row(
         children: [
           SizedBox(
-            width: 100,
-            height: 100,
+            width: 100, height: 100,
             child: Stack(
               alignment: Alignment.center,
               children: [
@@ -332,14 +390,11 @@ class _AttendanceRing extends StatelessWidget {
                     strokeCap: StrokeCap.round,
                   ),
                 ),
-                Text(
-                  '${(percentage * 100).toStringAsFixed(0)}%',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    color: _color,
-                  ),
-                ),
+                Text('${(percentage * 100).toStringAsFixed(0)}%',
+                    style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: _color)),
               ],
             ),
           ),
@@ -352,31 +407,27 @@ class _AttendanceRing extends StatelessWidget {
                   percentage >= 0.75
                       ? 'Excellent!'
                       : percentage >= 0.50
-                      ? 'Needs Improvement'
-                      : 'Critical',
+                          ? 'Needs Improvement'
+                          : total == 0
+                              ? 'No data yet'
+                              : 'Critical',
                   style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: _color,
-                  ),
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: _color),
                 ),
                 const SizedBox(height: 6),
-                Text(
-                  '$present out of $total days attended',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: AppTheme.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                if (percentage < 0.75)
-                  Text(
-                    'Need ${((0.75 * total) - present).ceil()} more days for 75%',
+                Text('$present out of $total days attended',
                     style: const TextStyle(
-                      fontSize: 12,
-                      color: AppTheme.accentOrange,
-                    ),
+                        fontSize: 13, color: AppTheme.textSecondary)),
+                if (percentage < 0.75 && total > 0) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'Need ${((0.75 * total) - present).ceil()} more for 75%',
+                    style: const TextStyle(
+                        fontSize: 12, color: AppTheme.accentOrange),
                   ),
+                ],
               ],
             ),
           ),
@@ -389,47 +440,37 @@ class _AttendanceRing extends StatelessWidget {
 class _CalendarGrid extends StatelessWidget {
   final DateTime month;
   final List<DateTime> presentDates;
-
-  const _CalendarGrid(
-      {required this.month, required this.presentDates});
+  const _CalendarGrid({required this.month, required this.presentDates});
 
   @override
   Widget build(BuildContext context) {
+    final daysInMonth = DateUtils.getDaysInMonth(month.year, month.month);
     final firstDay = DateTime(month.year, month.month, 1);
-    final daysInMonth =
-    DateUtils.getDaysInMonth(month.year, month.month);
-    final startWeekday = firstDay.weekday % 7; // Sunday = 0
-
+    final startWeekday = firstDay.weekday % 7; // Sun=0
     final presentSet = presentDates.map((d) => d.day).toSet();
     final today = DateTime.now();
 
     return GlassCard(
       child: Column(
         children: [
-          // Weekday headers
           Row(
             children: ['S', 'M', 'T', 'W', 'T', 'F', 'S']
                 .map((d) => Expanded(
-              child: Center(
-                child: Text(
-                  d,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppTheme.textMuted,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ))
+                      child: Center(
+                        child: Text(d,
+                            style: const TextStyle(
+                                fontSize: 12,
+                                color: AppTheme.textMuted,
+                                fontWeight: FontWeight.w600)),
+                      ),
+                    ))
                 .toList(),
           ),
           const SizedBox(height: 8),
-          // Days grid
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            gridDelegate:
-            const SliverGridDelegateWithFixedCrossAxisCount(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 7,
               childAspectRatio: 1,
               mainAxisSpacing: 4,
@@ -443,8 +484,8 @@ class _CalendarGrid extends StatelessWidget {
               final isToday = month.year == today.year &&
                   month.month == today.month &&
                   day == today.day;
-              final isFuture = DateTime(month.year, month.month, day)
-                  .isAfter(today);
+              final isFuture =
+                  DateTime(month.year, month.month, day).isAfter(today);
 
               return Container(
                 decoration: BoxDecoration(
@@ -452,48 +493,41 @@ class _CalendarGrid extends StatelessWidget {
                   color: isPresent
                       ? AppTheme.accentGreen.withOpacity(0.2)
                       : isToday
-                      ? AppTheme.primaryBlue.withOpacity(0.15)
-                      : null,
+                          ? AppTheme.primaryBlue.withOpacity(0.15)
+                          : null,
                   border: isToday
                       ? Border.all(
-                      color: AppTheme.primaryBlue.withOpacity(0.5))
+                          color: AppTheme.primaryBlue.withOpacity(0.5))
                       : isPresent
-                      ? Border.all(
-                      color:
-                      AppTheme.accentGreen.withOpacity(0.5))
-                      : null,
+                          ? Border.all(
+                              color: AppTheme.accentGreen.withOpacity(0.5))
+                          : null,
                 ),
                 child: Center(
-                  child: Text(
-                    '$day',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: isPresent || isToday
-                          ? FontWeight.w700
-                          : FontWeight.w400,
-                      color: isPresent
-                          ? AppTheme.accentGreen
-                          : isToday
-                          ? AppTheme.primaryBlue
-                          : isFuture
-                          ? AppTheme.textMuted
-                          : AppTheme.textSecondary,
-                    ),
-                  ),
+                  child: Text('$day',
+                      style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: isPresent || isToday
+                              ? FontWeight.w700
+                              : FontWeight.w400,
+                          color: isPresent
+                              ? AppTheme.accentGreen
+                              : isToday
+                                  ? AppTheme.primaryBlue
+                                  : isFuture
+                                      ? AppTheme.textMuted
+                                      : AppTheme.textSecondary)),
                 ),
               );
             },
           ),
-          const SizedBox(height: 8),
-          // Legend
+          const SizedBox(height: 10),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _LegendItem(
-                  color: AppTheme.accentGreen, label: 'Present'),
+              _Legend(AppTheme.accentGreen, 'Present'),
               const SizedBox(width: 16),
-              _LegendItem(
-                  color: AppTheme.primaryBlue, label: 'Today'),
+              _Legend(AppTheme.primaryBlue, 'Today'),
             ],
           ),
         ],
@@ -502,48 +536,40 @@ class _CalendarGrid extends StatelessWidget {
   }
 }
 
-class _LegendItem extends StatelessWidget {
+class _Legend extends StatelessWidget {
   final Color color;
   final String label;
-  const _LegendItem({required this.color, required this.label});
+  const _Legend(this.color, this.label);
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      Container(
           width: 10,
           height: 10,
-          decoration: BoxDecoration(shape: BoxShape.circle, color: color),
-        ),
-        const SizedBox(width: 5),
-        Text(label,
-            style: const TextStyle(
-                fontSize: 11, color: AppTheme.textSecondary)),
-      ],
-    );
+          decoration: BoxDecoration(shape: BoxShape.circle, color: color)),
+      const SizedBox(width: 5),
+      Text(label,
+          style:
+              const TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
+    ]);
   }
 }
 
 class _AttendanceListItem extends StatelessWidget {
   final AttendanceRecord record;
   final int index;
-
-  const _AttendanceListItem(
-      {required this.record, required this.index});
+  const _AttendanceListItem({required this.record, required this.index});
 
   @override
   Widget build(BuildContext context) {
     return GlassCard(
-      padding:
-      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       margin: const EdgeInsets.only(bottom: 10),
       child: Row(
         children: [
           Container(
-            width: 44,
-            height: 44,
+            width: 44, height: 44,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
               color: AppTheme.accentGreen.withOpacity(0.15),
@@ -554,10 +580,9 @@ class _AttendanceListItem extends StatelessWidget {
               child: Text(
                 DateFormat('dd').format(record.markedAt),
                 style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: AppTheme.accentGreen,
-                ),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: AppTheme.accentGreen),
               ),
             ),
           ),
@@ -566,23 +591,17 @@ class _AttendanceListItem extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  record.subject,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.textPrimary,
-                  ),
-                ),
+                Text(record.subject,
+                    style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textPrimary)),
                 const SizedBox(height: 2),
                 Text(
-                  DateFormat('EEE, MMM dd · hh:mm a')
-                      .format(record.markedAt),
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppTheme.textSecondary,
-                  ),
-                ),
+                    DateFormat('EEE, MMM dd · hh:mm a')
+                        .format(record.markedAt),
+                    style: const TextStyle(
+                        fontSize: 12, color: AppTheme.textSecondary)),
               ],
             ),
           ),
@@ -592,51 +611,16 @@ class _AttendanceListItem extends StatelessWidget {
               const Icon(Icons.check_circle_rounded,
                   color: AppTheme.accentGreen, size: 18),
               const SizedBox(height: 2),
-              Text(
-                '${record.distanceFromTeacher.toStringAsFixed(0)}m',
-                style: const TextStyle(
-                    fontSize: 11, color: AppTheme.textMuted),
-              ),
+              Text('${record.distanceFromTeacher.toStringAsFixed(0)}m',
+                  style: const TextStyle(
+                      fontSize: 11, color: AppTheme.textMuted)),
             ],
           ),
         ],
       ),
-    ).animate(delay: Duration(milliseconds: index * 60)).fadeIn().slideX(begin: 0.1);
-  }
-}
-
-class _EmptyAttendance extends StatelessWidget {
-  final DateTime month;
-  const _EmptyAttendance({required this.month});
-
-  @override
-  Widget build(BuildContext context) {
-    return GlassCard(
-      child: Column(
-        children: [
-          const Icon(Icons.event_busy_rounded,
-              color: AppTheme.textMuted, size: 40),
-          const SizedBox(height: 12),
-          Text(
-            'No attendance in ${DateFormat('MMMM').format(month)}',
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            'Your attendance records for this month\nwill appear here.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 13,
-              color: AppTheme.textSecondary,
-              height: 1.5,
-            ),
-          ),
-        ],
-      ),
-    ).animate().fadeIn();
+    )
+        .animate(delay: Duration(milliseconds: index * 50))
+        .fadeIn()
+        .slideX(begin: 0.1);
   }
 }

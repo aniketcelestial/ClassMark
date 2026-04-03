@@ -224,7 +224,7 @@ class _RoleCardState extends State<_RoleCard> {
                             borderRadius: BorderRadius.circular(6),
                             border: Border.all(
                               color:
-                              widget.gradientColors.first.withOpacity(0.4),
+                                  widget.gradientColors.first.withOpacity(0.4),
                             ),
                           ),
                           child: Text(

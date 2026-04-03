@@ -14,7 +14,7 @@ import 'features/teacher/screens/present_students_screen.dart';
 import 'features/student/screens/student_dashboard_screen.dart';
 import 'features/student/screens/enter_otp_screen.dart';
 import 'features/student/screens/monthly_attendance_screen.dart';
-import 'package:classmark/firebase_options.dart';
+import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

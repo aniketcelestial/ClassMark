@@ -64,7 +64,7 @@ class StudentDashboardScreen extends ConsumerWidget {
                           Navigator.pushNamedAndRemoveUntil(
                             context,
                             AppRoutes.roleSelect,
-                                (route) => false,
+                            (route) => false,
                           );
                         }
                       },
@@ -120,7 +120,7 @@ class StudentDashboardScreen extends ConsumerWidget {
                       _ActionCard(
                         title: 'Mark Attendance',
                         description:
-                        'Enter the OTP shared by your teacher to mark your presence',
+                            'Enter the OTP shared by your teacher to mark your presence',
                         icon: Icons.fingerprint_rounded,
                         colors: AppTheme.studentGradient,
                         onTap: () => Navigator.push(
@@ -134,7 +134,7 @@ class StudentDashboardScreen extends ConsumerWidget {
                       _ActionCard(
                         title: 'My Attendance',
                         description:
-                        'Check your monthly attendance records and percentage',
+                            'Check your monthly attendance records and percentage',
                         icon: Icons.calendar_month_rounded,
                         colors: [
                           AppTheme.primaryPurple,
@@ -144,7 +144,7 @@ class StudentDashboardScreen extends ConsumerWidget {
                           context,
                           MaterialPageRoute(
                               builder: (_) =>
-                              const MonthlyAttendanceScreen()),
+                                  const MonthlyAttendanceScreen()),
                         ),
                         delay: 400,
                       ),

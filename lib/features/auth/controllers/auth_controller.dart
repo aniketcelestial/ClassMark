@@ -1,11 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:classmark/shared/models/user_model.dart';
-import 'package:classmark/shared/services/auth_service.dart';
+import '../../shared/models/user_model.dart';
+import '../../shared/services/auth_service.dart';
 
 final authServiceProvider = Provider<AuthService>((ref) => AuthService());
 
 final currentUserProvider = StateNotifierProvider<CurrentUserNotifier, UserModel?>(
-      (ref) => CurrentUserNotifier(ref.read(authServiceProvider)),
+  (ref) => CurrentUserNotifier(ref.read(authServiceProvider)),
 );
 
 class CurrentUserNotifier extends StateNotifier<UserModel?> {
