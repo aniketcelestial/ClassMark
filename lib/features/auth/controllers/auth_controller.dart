@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../shared/models/user_model.dart';
-import '../../shared/services/auth_service.dart';
+import 'package:classmark/shared/models/user_model.dart';
+import 'package:classmark/shared/services/auth_service.dart';
 
 final authServiceProvider = Provider<AuthService>((ref) => AuthService());
 
