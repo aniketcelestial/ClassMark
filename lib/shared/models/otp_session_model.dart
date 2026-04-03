@@ -7,8 +7,7 @@ class OtpSession {
   final String subject;
   final String className;
   final String otp;
-  final double teacherLatitude;
-  final double teacherLongitude;
+  final String teacherBluetoothId;
   final DateTime createdAt;
   final DateTime expiresAt;
   final bool isActive;
@@ -20,8 +19,7 @@ class OtpSession {
     required this.subject,
     required this.className,
     required this.otp,
-    required this.teacherLatitude,
-    required this.teacherLongitude,
+    required this.teacherBluetoothId,
     required this.createdAt,
     required this.expiresAt,
     required this.isActive,
@@ -36,8 +34,7 @@ class OtpSession {
       subject: data['subject'] ?? '',
       className: data['className'] ?? '',
       otp: data['otp'] ?? '',
-      teacherLatitude: (data['teacherLatitude'] ?? 0.0).toDouble(),
-      teacherLongitude: (data['teacherLongitude'] ?? 0.0).toDouble(),
+      teacherBluetoothId: data['teacherBluetoothId'] ?? '',
       createdAt: (data['createdAt'] as Timestamp).toDate(),
       expiresAt: (data['expiresAt'] as Timestamp).toDate(),
       isActive: data['isActive'] ?? false,
@@ -51,8 +48,7 @@ class OtpSession {
       'subject': subject,
       'className': className,
       'otp': otp,
-      'teacherLatitude': teacherLatitude,
-      'teacherLongitude': teacherLongitude,
+      'teacherBluetoothId': teacherBluetoothId,
       'createdAt': Timestamp.fromDate(createdAt),
       'expiresAt': Timestamp.fromDate(expiresAt),
       'isActive': isActive,

@@ -1,5 +1,5 @@
 name: classmark
-description: A smart attendance marking app with OTP and geofencing.
+description: A smart attendance marking app with OTP and Bluetooth tracing.
 publish_to: "none"
 version: 1.0.0+1
 
@@ -15,8 +15,8 @@ dependencies:
   firebase_auth: ^5.1.4
   cloud_firestore: ^5.2.1
 
-  # Location & Geofencing
-  geolocator: ^13.0.1
+  # Location & bluetooth tracking
+  flutter_blue_plus: ^1.31.15
   permission_handler: ^11.3.1
 
   # State Management

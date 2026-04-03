@@ -60,13 +60,13 @@ class _GenerateOtpScreenState extends ConsumerState<GenerateOtpScreen> {
     setState(() {
       _isGenerating = true;
       _lastError = null;
-      _loadingStep = 'Requesting location permission...';
+      _loadingStep = 'Requesting Bluetooth permission...';
     });
 
     // Small delay so user sees the step message
     await Future.delayed(const Duration(milliseconds: 300));
     if (!mounted) return;
-    setState(() => _loadingStep = 'Getting your GPS coordinates...');
+    setState(() => _loadingStep = 'Reading Bluetooth Adapter Id...');
 
     final error = await ref.read(activeSessionProvider.notifier).generateOtp(
           teacherId: user.uid,
@@ -194,9 +194,9 @@ class _GenerateOtpScreenState extends ConsumerState<GenerateOtpScreen> {
                                   session.className),
                               const Divider(color: AppTheme.glassBorder),
                               _Row(
-                                Icons.location_on_outlined,
-                                'Location',
-                                '${session.teacherLatitude.toStringAsFixed(5)},\n${session.teacherLongitude.toStringAsFixed(5)}',
+                                Icons.bluetooth_rounded,
+                                'Bluetooth ID',
+                                session.teacherBluetoothId,
                               ),
                             ],
                           ),
@@ -260,17 +260,9 @@ class _GenerateOtpScreenState extends ConsumerState<GenerateOtpScreen> {
                           padding: const EdgeInsets.all(14),
                           child: Column(
                             children: const [
-                              _InfoRow(
-                                  Icons.location_on_outlined,
-                                  'Your GPS location is captured when OTP is generated'),
-                              SizedBox(height: 8),
-                              _InfoRow(
-                                  Icons.radar_rounded,
-                                  'Students must be within 20 metres to mark attendance'),
-                              SizedBox(height: 8),
-                              _InfoRow(
-                                  Icons.timer_outlined,
-                                  'OTP expires automatically after 10 minutes'),
+                              _InfoRow(Icons.bluetooth_rounded, 'Your Bluetooth ID is captured when OTP is generated'),
+                              _InfoRow(Icons.radar_rounded, 'Students must be within ~20 metres (BLE range) to mark attendance'),
+                              _InfoRow(Icons.timer_outlined, 'OTP expires automatically after 10 minutes'),
                             ],
                           ),
                         ),
@@ -484,8 +476,8 @@ class _NoSessionPlaceholder extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             isLoading
-                ? 'Fetching your location — this may take up to 20 seconds...'
-                : 'Tap the button below to start an attendance session.\nMake sure GPS / Location is enabled.',
+                ? 'Fetching — this may take up to 20 seconds...'
+                : 'Tap the button below to start an attendance session.\nMake sure Bluetooth is enabled on this device.',
             textAlign: TextAlign.center,
             style: const TextStyle(
                 fontSize: 13,

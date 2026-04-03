@@ -66,11 +66,11 @@ class _EnterOtpScreenState extends ConsumerState<EnterOtpScreen> {
       case OtpSubmitResult.invalidOtp:
         return '❌ Invalid OTP. Please check and try again.';
       case OtpSubmitResult.expired:
-        return '⏰ This OTP has expired. Ask your teacher to generate a new one.';
+        return '⏰ This OTP has expired. Ask your teacher for a new one.';
       case OtpSubmitResult.outOfRange:
-        return '📍 You are too far from the teacher (>20m). Move closer and try again.';
-      case OtpSubmitResult.locationError:
-        return '🛰️ Could not get your location. Please enable location access.';
+        return '📡 You are too far from the teacher. Move closer and try again.';
+      case OtpSubmitResult.bluetoothError:
+        return '🔵 Bluetooth error. Make sure Bluetooth is on and try again.';
       case OtpSubmitResult.alreadyMarked:
         return '✅ You have already marked attendance for this session.';
       case OtpSubmitResult.error:
@@ -84,7 +84,7 @@ class _EnterOtpScreenState extends ConsumerState<EnterOtpScreen> {
       case OtpSubmitResult.alreadyMarked:
         return AppTheme.accentGreen;
       case OtpSubmitResult.outOfRange:
-      case OtpSubmitResult.locationError:
+      case OtpSubmitResult.bluetoothError:
         return AppTheme.accentOrange;
       default:
         return AppTheme.errorRed;

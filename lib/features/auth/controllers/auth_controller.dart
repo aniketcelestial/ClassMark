@@ -1,24 +1,56 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:classmark/shared/models/user_model.dart';
-import 'package:classmark/shared/services/auth_service.dart';
+import '../../../shared/models/user_model.dart';
+import '../../../shared/services/auth_service.dart';
+import '../../../core/utils/logger.dart';
 
 final authServiceProvider = Provider<AuthService>((ref) => AuthService());
 
-final currentUserProvider = StateNotifierProvider<CurrentUserNotifier, UserModel?>(
-  (ref) => CurrentUserNotifier(ref.read(authServiceProvider)),
+// Tracks whether the initial Firebase auth check is complete
+final authReadyProvider = StateProvider<bool>((ref) => false);
+
+final currentUserProvider =
+    StateNotifierProvider<CurrentUserNotifier, UserModel?>(
+  (ref) => CurrentUserNotifier(
+    ref.read(authServiceProvider),
+    ref,
+  ),
 );
 
 class CurrentUserNotifier extends StateNotifier<UserModel?> {
   final AuthService _authService;
+  final Ref _ref;
 
-  CurrentUserNotifier(this._authService) : super(null) {
+  CurrentUserNotifier(this._authService, this._ref) : super(null) {
     _init();
   }
 
   Future<void> _init() async {
-    final firebaseUser = _authService.currentUser;
-    if (firebaseUser != null) {
-      state = await _authService.getUserData(firebaseUser.uid);
+    try {
+      // Wait for Firebase Auth to emit its first event
+      // This guarantees we know the real auth state before proceeding
+      final firebaseUser = await FirebaseAuth.instance
+          .authStateChanges()
+          .first
+          .timeout(
+            const Duration(seconds: 10),
+            onTimeout: () => null,
+          );
+
+      if (firebaseUser != null) {
+        appLogger.i('Restoring session for: ${firebaseUser.email}');
+        state = await _authService.getUserData(firebaseUser.uid);
+        appLogger.i('Session restored: ${state?.name} (${state?.role})');
+      } else {
+        appLogger.i('No active session found');
+        state = null;
+      }
+    } catch (e) {
+      appLogger.e('Auth init error: $e');
+      state = null;
+    } finally {
+      // Signal splash screen that auth check is complete regardless
+      _ref.read(authReadyProvider.notifier).state = true;
     }
   }
 
@@ -27,7 +59,8 @@ class CurrentUserNotifier extends StateNotifier<UserModel?> {
     required String password,
   }) async {
     try {
-      final user = await _authService.signIn(email: email, password: password);
+      final user =
+          await _authService.signIn(email: email, password: password);
       state = user;
       return null;
     } catch (e) {

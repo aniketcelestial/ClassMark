@@ -9,9 +9,7 @@ class AttendanceRecord {
   final String className;
   final String sessionId;
   final DateTime markedAt;
-  final double studentLatitude;
-  final double studentLongitude;
-  final double distanceFromTeacher;
+  final double distanceFromTeacher; // BLE RSSI-estimated metres
 
   const AttendanceRecord({
     required this.id,
@@ -22,8 +20,6 @@ class AttendanceRecord {
     required this.className,
     required this.sessionId,
     required this.markedAt,
-    required this.studentLatitude,
-    required this.studentLongitude,
     required this.distanceFromTeacher,
   });
 
@@ -38,8 +34,6 @@ class AttendanceRecord {
       className: data['className'] ?? '',
       sessionId: data['sessionId'] ?? '',
       markedAt: (data['markedAt'] as Timestamp).toDate(),
-      studentLatitude: (data['studentLatitude'] ?? 0.0).toDouble(),
-      studentLongitude: (data['studentLongitude'] ?? 0.0).toDouble(),
       distanceFromTeacher: (data['distanceFromTeacher'] ?? 0.0).toDouble(),
     );
   }
@@ -53,8 +47,6 @@ class AttendanceRecord {
       'className': className,
       'sessionId': sessionId,
       'markedAt': Timestamp.fromDate(markedAt),
-      'studentLatitude': studentLatitude,
-      'studentLongitude': studentLongitude,
       'distanceFromTeacher': distanceFromTeacher,
     };
   }

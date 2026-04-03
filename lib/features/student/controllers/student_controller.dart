@@ -1,8 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../shared/models/attendance_model.dart';
 import '../../../shared/services/otp_service.dart';
-import '../../../shared/services/location_service.dart';
-import '../../../core/constants/app_constants.dart';
+import '../../../shared/services/ble_service.dart';
 import '../../../core/utils/logger.dart';
 import '../../teacher/controllers/teacher_controller.dart';
 
@@ -11,15 +10,13 @@ enum OtpSubmitResult {
   invalidOtp,
   expired,
   outOfRange,
-  locationError,
+  bluetoothError,
   alreadyMarked,
   error,
 }
 
-final studentControllerProvider =
-    Provider<StudentController>((ref) {
-  return StudentController(ref.read(otpServiceProvider));
-});
+final studentControllerProvider = Provider<StudentController>(
+        (ref) => StudentController(ref.read(otpServiceProvider)));
 
 class StudentController {
   final OtpService _otpService;
@@ -31,37 +28,37 @@ class StudentController {
     required String studentName,
   }) async {
     try {
-      // 1. Validate OTP
+      // 1. Validate OTP exists and is active
       final session = await _otpService.validateOtp(otp);
       if (session == null) return OtpSubmitResult.invalidOtp;
       if (session.isExpired) return OtpSubmitResult.expired;
 
-      // 2. Check if already marked
+      // 2. Check already marked
       final alreadyMarked = await _otpService.hasStudentMarkedAttendance(
         studentId: studentId,
         sessionId: session.id,
       );
       if (alreadyMarked) return OtpSubmitResult.alreadyMarked;
 
-      // 3. Get student location
-      final position = await LocationService.getCurrentPosition();
-      if (position == null) return OtpSubmitResult.locationError;
-
-      // 4. Check proximity (20m range)
-      final distance = LocationService.calculateDistance(
-        lat1: session.teacherLatitude,
-        lon1: session.teacherLongitude,
-        lat2: position.latitude,
-        lon2: position.longitude,
+      // 3. BLE proximity check
+      appLogger.i('Scanning for teacher BT: ${session.teacherBluetoothId}');
+      final bleResult = await BleService.checkProximityToTeacher(
+        teacherBluetoothId: session.teacherBluetoothId,
       );
 
-      if (distance > AppConstants.proximityRadiusMeters) {
-        appLogger.w(
-            'Student out of range: ${distance.toStringAsFixed(1)}m');
+      if (bleResult.error != null && bleResult.meters == null) {
+        // Device not found at all
+        appLogger.w('BLE proximity error: ${bleResult.error}');
         return OtpSubmitResult.outOfRange;
       }
 
-      // 5. Mark attendance
+      if (!bleResult.inRange) {
+        appLogger.w(
+            'Student out of range: ${bleResult.meters?.toStringAsFixed(1)}m');
+        return OtpSubmitResult.outOfRange;
+      }
+
+      // 4. Mark attendance
       final record = AttendanceRecord(
         id: '',
         studentId: studentId,
@@ -71,16 +68,15 @@ class StudentController {
         className: session.className,
         sessionId: session.id,
         markedAt: DateTime.now(),
-        studentLatitude: position.latitude,
-        studentLongitude: position.longitude,
-        distanceFromTeacher: distance,
+        distanceFromTeacher: bleResult.meters ?? 0.0,
       );
 
       await _otpService.markAttendance(record);
-      appLogger.i('Attendance marked! Distance: ${distance.toStringAsFixed(1)}m');
+      appLogger.i(
+          'Attendance marked! BLE distance: ${bleResult.meters?.toStringAsFixed(1)}m');
       return OtpSubmitResult.success;
-    } catch (e) {
-      appLogger.e('Submit OTP error: $e');
+    } catch (e, stack) {
+      appLogger.e('submitOtp error', error: e, stackTrace: stack);
       return OtpSubmitResult.error;
     }
   }

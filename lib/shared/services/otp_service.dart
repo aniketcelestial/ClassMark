@@ -18,15 +18,14 @@ class OtpService {
     required String teacherName,
     required String subject,
     required String className,
-    required double latitude,
-    required double longitude,
+    required String bluetoothId,
   }) async {
-    // Deactivate existing sessions — simple query, no composite index needed
     await _deactivateExistingSessions(teacherId);
 
     final otp = generateOtp();
     final now = DateTime.now();
-    final expiresAt = now.add(Duration(minutes: AppConstants.otpExpiryMinutes));
+    final expiresAt =
+    now.add(Duration(minutes: AppConstants.otpExpiryMinutes));
 
     final docRef = _db.collection(AppConstants.otpCollection).doc();
     final session = OtpSession(
@@ -36,35 +35,30 @@ class OtpService {
       subject: subject,
       className: className,
       otp: otp,
-      teacherLatitude: latitude,
-      teacherLongitude: longitude,
+      teacherBluetoothId: bluetoothId,
       createdAt: now,
       expiresAt: expiresAt,
       isActive: true,
     );
 
     await docRef.set(session.toMap());
-    appLogger.i('OTP created: ${session.otp} | session: ${session.id}');
+    appLogger.i('OTP created: ${session.otp} | BT: $bluetoothId');
     return session;
   }
 
   Future<void> _deactivateExistingSessions(String teacherId) async {
-    // Single-field where clause — no composite index needed
     final snap = await _db
         .collection(AppConstants.otpCollection)
         .where('teacherId', isEqualTo: teacherId)
         .get();
-
     for (final doc in snap.docs) {
-      final data = doc.data();
-      if (data['isActive'] == true) {
+      if (doc.data()['isActive'] == true) {
         await doc.reference.update({'isActive': false});
       }
     }
   }
 
   Future<OtpSession?> getActiveSession(String teacherId) async {
-    // Single-field query — no composite index needed
     final snap = await _db
         .collection(AppConstants.otpCollection)
         .where('teacherId', isEqualTo: teacherId)
@@ -72,14 +66,15 @@ class OtpService {
 
     if (snap.docs.isEmpty) return null;
 
-    // Filter and sort in Dart
-    final active = snap.docs.where((d) => d.data()['isActive'] == true).toList();
+    final active = snap.docs
+        .where((d) => d.data()['isActive'] == true)
+        .toList();
     if (active.isEmpty) return null;
 
     active.sort((a, b) {
       final ta = (a.data()['createdAt'] as Timestamp).toDate();
       final tb = (b.data()['createdAt'] as Timestamp).toDate();
-      return tb.compareTo(ta); // newest first
+      return tb.compareTo(ta);
     });
 
     final session = OtpSession.fromFirestore(active.first);
@@ -91,7 +86,6 @@ class OtpService {
   }
 
   Future<OtpSession?> validateOtp(String otp) async {
-    // Single-field query — no composite index needed
     final snap = await _db
         .collection(AppConstants.otpCollection)
         .where('otp', isEqualTo: otp)
@@ -99,8 +93,9 @@ class OtpService {
 
     if (snap.docs.isEmpty) return null;
 
-    // Filter active in Dart
-    final active = snap.docs.where((d) => d.data()['isActive'] == true).toList();
+    final active = snap.docs
+        .where((d) => d.data()['isActive'] == true)
+        .toList();
     if (active.isEmpty) return null;
 
     final session = OtpSession.fromFirestore(active.first);
@@ -124,10 +119,8 @@ class OtpService {
   }
 
   Future<void> markAttendance(AttendanceRecord record) async {
-    final ref = await _db
-        .collection(AppConstants.attendanceCollection)
-        .add(record.toMap());
-    appLogger.i('Attendance marked: ${ref.id} for ${record.studentName}');
+    await _db.collection(AppConstants.attendanceCollection).add(record.toMap());
+    appLogger.i('Attendance marked for ${record.studentName}');
   }
 
   Future<void> deactivateSession(String sessionId) async {
@@ -142,33 +135,33 @@ class OtpService {
         .collection(AppConstants.attendanceCollection)
         .where('sessionId', isEqualTo: sessionId)
         .snapshots()
-        .map((s) => s.docs
-            .map((d) => AttendanceRecord.fromFirestore(d))
-            .toList());
+        .map((s) =>
+        s.docs.map((d) => AttendanceRecord.fromFirestore(d)).toList());
   }
 
   Future<List<AttendanceRecord>> getStudentMonthlyAttendance({
     required String studentId,
     required DateTime month,
   }) async {
-    // Single-field query only — filter by date range in Dart to avoid composite index
     final snap = await _db
         .collection(AppConstants.attendanceCollection)
         .where('studentId', isEqualTo: studentId)
         .get();
 
     final startOfMonth = DateTime(month.year, month.month, 1);
-    final endOfMonth = DateTime(month.year, month.month + 1, 0, 23, 59, 59);
+    final endOfMonth =
+    DateTime(month.year, month.month + 1, 0, 23, 59, 59);
 
     final records = snap.docs
         .map((d) => AttendanceRecord.fromFirestore(d))
         .where((r) =>
-            r.markedAt.isAfter(startOfMonth.subtract(const Duration(seconds: 1))) &&
-            r.markedAt.isBefore(endOfMonth.add(const Duration(seconds: 1))))
+    r.markedAt.isAfter(
+        startOfMonth.subtract(const Duration(seconds: 1))) &&
+        r.markedAt
+            .isBefore(endOfMonth.add(const Duration(seconds: 1))))
         .toList();
 
     records.sort((a, b) => a.markedAt.compareTo(b.markedAt));
-    appLogger.i('Monthly attendance for $studentId in ${month.month}/${month.year}: ${records.length} records');
     return records;
   }
 }

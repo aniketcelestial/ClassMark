@@ -14,15 +14,19 @@ class SplashScreen extends ConsumerStatefulWidget {
 }
 
 class _SplashScreenState extends ConsumerState<SplashScreen> {
+  bool _navigated = false;
+
   @override
   void initState() {
     super.initState();
-    _navigate();
+    // Trigger provider initialization
+    ref.read(currentUserProvider);
   }
 
-  Future<void> _navigate() async {
-    await Future.delayed(const Duration(milliseconds: 2800));
-    if (!mounted) return;
+  void _navigate() {
+    if (_navigated || !mounted) return;
+    _navigated = true;
+
     final user = ref.read(currentUserProvider);
     if (user != null) {
       if (user.role == 'teacher') {
@@ -37,6 +41,13 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Watch authReady — when it flips to true, navigate
+    final authReady = ref.watch(authReadyProvider);
+    if (authReady && !_navigated) {
+      // Use addPostFrameCallback so we don't navigate during build
+      WidgetsBinding.instance.addPostFrameCallback((_) => _navigate());
+    }
+
     return Scaffold(
       body: AnimatedMeshBackground(
         colors: const [
@@ -48,7 +59,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Logo Icon
+              // Logo
               Container(
                 width: 100,
                 height: 100,
@@ -63,63 +74,70 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
                     BoxShadow(
                       color: AppTheme.primaryBlue.withOpacity(0.5),
                       blurRadius: 30,
-                      spreadRadius: 0,
                       offset: const Offset(0, 10),
                     ),
                   ],
                 ),
-                child: const Icon(
-                  Icons.school_rounded,
-                  color: Colors.white,
-                  size: 52,
-                ),
+                child: const Icon(Icons.school_rounded,
+                    color: Colors.white, size: 52),
               )
                   .animate()
                   .fadeIn(duration: 600.ms)
-                  .scale(begin: const Offset(0.5, 0.5), curve: Curves.elasticOut),
+                  .scale(
+                      begin: const Offset(0.5, 0.5),
+                      curve: Curves.elasticOut),
+
               const SizedBox(height: 28),
-              // App Name
-              Text(
-                'ClassMark',
-                style: TextStyle(
-                  fontSize: 42,
-                  fontWeight: FontWeight.w800,
-                  foreground: Paint()
-                    ..shader = const LinearGradient(
-                      colors: [
-                        AppTheme.primaryBlue,
-                        AppTheme.primaryPurple,
-                      ],
-                    ).createShader(
-                        const Rect.fromLTWH(0, 0, 280, 50)),
-                  letterSpacing: -1,
+
+              // App name with gradient
+              ShaderMask(
+                shaderCallback: (bounds) => const LinearGradient(
+                  colors: [
+                    AppTheme.primaryBlue,
+                    AppTheme.primaryPurple,
+                  ],
+                ).createShader(bounds),
+                child: const Text(
+                  'ClassMark',
+                  style: TextStyle(
+                    fontSize: 42,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white, // overridden by shader
+                    letterSpacing: -1,
+                  ),
                 ),
               )
                   .animate(delay: 300.ms)
                   .fadeIn(duration: 500.ms)
                   .slideY(begin: 0.3, curve: Curves.easeOut),
+
               const SizedBox(height: 8),
-              Text(
+
+              const Text(
                 'Smart Attendance, Simplified',
                 style: TextStyle(
                   fontSize: 15,
                   color: AppTheme.textSecondary,
                   letterSpacing: 0.5,
                 ),
-              )
-                  .animate(delay: 500.ms)
-                  .fadeIn(duration: 500.ms),
+              ).animate(delay: 500.ms).fadeIn(duration: 500.ms),
+
               const SizedBox(height: 64),
-              SizedBox(
-                width: 32,
-                height: 32,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.5,
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                    AppTheme.primaryBlue.withOpacity(0.7),
+
+              // Show spinner while waiting for auth
+              if (!authReady)
+                SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      AppTheme.primaryBlue.withOpacity(0.7),
+                    ),
                   ),
-                ),
-              ).animate(delay: 800.ms).fadeIn(),
+                ).animate(delay: 800.ms).fadeIn()
+              else
+                const SizedBox(height: 28),
             ],
           ),
         ),

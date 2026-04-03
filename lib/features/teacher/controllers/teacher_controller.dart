@@ -2,14 +2,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../shared/models/otp_session_model.dart';
 import '../../../shared/models/attendance_model.dart';
 import '../../../shared/services/otp_service.dart';
-import '../../../shared/services/location_service.dart';
+import '../../../shared/services/ble_service.dart';
 import '../../../core/utils/logger.dart';
 
 final otpServiceProvider = Provider<OtpService>((ref) => OtpService());
 
 final activeSessionProvider =
-    StateNotifierProvider<ActiveSessionNotifier, OtpSession?>(
-  (ref) => ActiveSessionNotifier(ref.read(otpServiceProvider)),
+StateNotifierProvider<ActiveSessionNotifier, OtpSession?>(
+      (ref) => ActiveSessionNotifier(ref.read(otpServiceProvider)),
 );
 
 class ActiveSessionNotifier extends StateNotifier<OtpSession?> {
@@ -23,27 +23,25 @@ class ActiveSessionNotifier extends StateNotifier<OtpSession?> {
     required String className,
   }) async {
     try {
-      // Get location with a specific error message
-      final locResult = await LocationService.getPositionWithReason();
-      if (locResult.position == null) {
-        appLogger.e('Location failed: ${locResult.error}');
-        return locResult.error;
+      // Get teacher's Bluetooth address to store in session
+      final btResult = await BleService.getBluetoothAddress();
+      if (btResult.id == null) {
+        appLogger.e('BLE error: ${btResult.error}');
+        return btResult.error;
       }
 
-      final pos = locResult.position!;
-      appLogger.i('Creating OTP session for $teacherName at ${pos.latitude}, ${pos.longitude}');
+      appLogger.i('Creating OTP session. BT ID: ${btResult.id}');
 
       final session = await _otpService.createOtpSession(
         teacherId: teacherId,
         teacherName: teacherName,
         subject: subject,
         className: className,
-        latitude: pos.latitude,
-        longitude: pos.longitude,
+        bluetoothId: btResult.id!,
       );
 
       state = session;
-      appLogger.i('OTP generated successfully: ${session.otp}');
+      appLogger.i('OTP generated: ${session.otp}');
       return null;
     } catch (e, stack) {
       appLogger.e('Generate OTP error', error: e, stackTrace: stack);
@@ -73,7 +71,7 @@ class ActiveSessionNotifier extends StateNotifier<OtpSession?> {
 }
 
 final presentStudentsProvider =
-    StreamProvider.family<List<AttendanceRecord>, String>(
-  (ref, sessionId) =>
+StreamProvider.family<List<AttendanceRecord>, String>(
+      (ref, sessionId) =>
       ref.read(otpServiceProvider).getPresentStudents(sessionId),
 );

@@ -57,6 +57,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.13.1"
+  bluez:
+    dependency: transitive
+    description:
+      name: bluez
+      sha256: "61a7204381925896a374301498f2f5399e59827c6498ae1e924aaa598751b545"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.8.3"
   boolean_selector:
     dependency: transitive
     description:
@@ -374,6 +382,54 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "4.5.2"
+  flutter_blue_plus:
+    dependency: "direct main"
+    description:
+      name: flutter_blue_plus
+      sha256: "69a8c87c11fc792e8cf0f997d275484fbdb5143ac9f0ac4d424429700cb4e0ed"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.36.8"
+  flutter_blue_plus_android:
+    dependency: transitive
+    description:
+      name: flutter_blue_plus_android
+      sha256: "6f7fe7e69659c30af164a53730707edc16aa4d959e4c208f547b893d940f853d"
+      url: "https://pub.dev"
+    source: hosted
+    version: "7.0.4"
+  flutter_blue_plus_darwin:
+    dependency: transitive
+    description:
+      name: flutter_blue_plus_darwin
+      sha256: "682982862c1d964f4d54a3fb5fccc9e59a066422b93b7e22079aeecd9c0d38f8"
+      url: "https://pub.dev"
+    source: hosted
+    version: "7.0.3"
+  flutter_blue_plus_linux:
+    dependency: transitive
+    description:
+      name: flutter_blue_plus_linux
+      sha256: "56b0c45edd0a2eec8f85bd97a26ac3cd09447e10d0094fed55587bf0592e3347"
+      url: "https://pub.dev"
+    source: hosted
+    version: "7.0.3"
+  flutter_blue_plus_platform_interface:
+    dependency: transitive
+    description:
+      name: flutter_blue_plus_platform_interface
+      sha256: "84fbd180c50a40c92482f273a92069960805ce324e3673ad29c41d2faaa7c5c2"
+      url: "https://pub.dev"
+    source: hosted
+    version: "7.0.0"
+  flutter_blue_plus_web:
+    dependency: transitive
+    description:
+      name: flutter_blue_plus_web
+      sha256: a1aceee753d171d24c0e0cdadb37895b5e9124862721f25f60bb758e20b72c99
+      url: "https://pub.dev"
+    source: hosted
+    version: "7.0.2"
   flutter_lints:
     dependency: "direct dev"
     description:
@@ -432,54 +488,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "4.0.0"
-  geolocator:
-    dependency: "direct main"
-    description:
-      name: geolocator
-      sha256: f62bcd90459e63210bbf9c35deb6a51c521f992a78de19a1fe5c11704f9530e2
-      url: "https://pub.dev"
-    source: hosted
-    version: "13.0.4"
-  geolocator_android:
-    dependency: transitive
-    description:
-      name: geolocator_android
-      sha256: fcb1760a50d7500deca37c9a666785c047139b5f9ee15aa5469fae7dbbe3170d
-      url: "https://pub.dev"
-    source: hosted
-    version: "4.6.2"
-  geolocator_apple:
-    dependency: transitive
-    description:
-      name: geolocator_apple
-      sha256: dbdd8789d5aaf14cf69f74d4925ad1336b4433a6efdf2fce91e8955dc921bf22
-      url: "https://pub.dev"
-    source: hosted
-    version: "2.3.13"
-  geolocator_platform_interface:
-    dependency: transitive
-    description:
-      name: geolocator_platform_interface
-      sha256: "30cb64f0b9adcc0fb36f628b4ebf4f731a2961a0ebd849f4b56200205056fe67"
-      url: "https://pub.dev"
-    source: hosted
-    version: "4.2.6"
-  geolocator_web:
-    dependency: transitive
-    description:
-      name: geolocator_web
-      sha256: b1ae9bdfd90f861fde8fd4f209c37b953d65e92823cb73c7dee1fa021b06f172
-      url: "https://pub.dev"
-    source: hosted
-    version: "4.1.3"
-  geolocator_windows:
-    dependency: transitive
-    description:
-      name: geolocator_windows
-      sha256: "175435404d20278ffd220de83c2ca293b73db95eafbdc8131fe8609be1421eb6"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.2.5"
   glassmorphism:
     dependency: "direct main"
     description:
@@ -904,6 +912,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.6.5"
+  rxdart:
+    dependency: transitive
+    description:
+      name: rxdart
+      sha256: "5c3004a4a8dbb94bd4bf5412a4def4acdaa12e12f269737a5751369e12d1a962"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.28.0"
   shared_preferences:
     dependency: "direct main"
     description:

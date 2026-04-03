@@ -1,23 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Internet -->
     <uses-permission android:name="android.permission.INTERNET"/>
-
-    <!-- Location Permissions (for geofencing proximity check) -->
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
-    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION"/>
-
-    <!-- Foreground Service for location -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
+    <uses-permission android:name="android.permission.BLUETOOTH"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE"/>
+    <uses-feature android:name="android.hardware.bluetooth_le" android:required="true"/>
 
     <application
         android:label="ClassMark"
-        android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
-        android:usesCleartextTraffic="true">
+        android:hardwareAccelerated="true">
 
         <activity
             android:name=".MainActivity"
@@ -26,7 +22,6 @@
             android:taskAffinity=""
             android:theme="@style/LaunchTheme"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
-            android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize">
             <meta-data
                 android:name="io.flutter.embedding.android.NormalTheme"
@@ -39,7 +34,7 @@
 
         <meta-data
             android:name="flutterEmbedding"
-            android:value="2" />
+            android:value="2"/>
 
     </application>
 </manifest>
