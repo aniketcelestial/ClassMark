@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.classmark.app"
+    namespace = "com.example.classmark"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -21,8 +21,8 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.classmark.app"
-        minSdk = 23
+        applicationId = "com.example.classmark"
+        minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
