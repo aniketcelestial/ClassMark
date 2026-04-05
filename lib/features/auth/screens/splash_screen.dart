@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -19,34 +20,54 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    // Trigger provider initialization
-    ref.read(currentUserProvider);
+
+    Future.microtask(() {
+      ref.read(currentUserProvider);
+    });
   }
 
   void _navigate() {
     if (_navigated || !mounted) return;
     _navigated = true;
 
-    final user = ref.read(currentUserProvider);
-    if (user != null) {
-      if (user.role == 'teacher') {
-        Navigator.pushReplacementNamed(context, AppRoutes.teacherDashboard);
+    final firebaseUser = FirebaseAuth.instance.currentUser;
+
+    if (firebaseUser != null) {
+      final user = ref.read(currentUserProvider);
+
+      if (user?.role == 'teacher') {
+        Navigator.pushReplacementNamed(
+          context,
+          AppRoutes.teacherDashboard,
+        );
+      } else if (user?.role == 'student') {
+        Navigator.pushReplacementNamed(
+          context,
+          AppRoutes.studentDashboard,
+        );
       } else {
-        Navigator.pushReplacementNamed(context, AppRoutes.studentDashboard);
+        Navigator.pushReplacementNamed(
+          context,
+          AppRoutes.roleSelect,
+        );
       }
     } else {
-      Navigator.pushReplacementNamed(context, AppRoutes.roleSelect);
+      Navigator.pushReplacementNamed(
+        context,
+        AppRoutes.roleSelect,
+      );
     }
   }
-
   @override
   Widget build(BuildContext context) {
     // Watch authReady — when it flips to true, navigate
     final authReady = ref.watch(authReadyProvider);
-    if (authReady && !_navigated) {
-      // Use addPostFrameCallback so we don't navigate during build
-      WidgetsBinding.instance.addPostFrameCallback((_) => _navigate());
-    }
+    Future.delayed(const Duration(seconds: 4), () {
+      if (!_navigated && mounted) {
+        _navigate();
+      }
+    });
+
 
     return Scaffold(
       body: AnimatedMeshBackground(

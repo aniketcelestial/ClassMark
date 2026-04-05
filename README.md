@@ -37,7 +37,7 @@ lib/
 │   ├── services/
 │   │   ├── auth_service.dart          # Firebase Auth wrapper
 │   │   ├── otp_service.dart           # Firestore OTP CRUD
-│   │   └── location_service.dart      # GPS + proximity check
+│   │   └── ble_service.dart           # Bluetooth BLE proximity
 │   └── widgets/
 │       ├── glass_card.dart            # Reusable glassmorphism card
 │       ├── gradient_button.dart       # Animated gradient button

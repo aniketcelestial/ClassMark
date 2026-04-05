@@ -50,6 +50,7 @@ class OtpService {
     final snap = await _db
         .collection(AppConstants.otpCollection)
         .where('teacherId', isEqualTo: teacherId)
+        .where('isActive', isEqualTo: true)
         .get();
     for (final doc in snap.docs) {
       if (doc.data()['isActive'] == true) {

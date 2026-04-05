@@ -103,7 +103,7 @@ class RoleSelectScreen extends StatelessWidget {
                   delay: 500,
                   tag: 'LEARNER',
                 ),
-                const Spacer(),
+                const SizedBox(height: 32),
                 Center(
                   child: Text(
                     'Secure · Proximity-Verified · Real-time',

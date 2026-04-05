@@ -31,7 +31,9 @@ class UserModel {
       subject: data['subject'],
       rollNumber: data['rollNumber'],
       className: data['className'],
-      createdAt: (data['createdAt'] as Timestamp).toDate(),
+      createdAt: data['createdAt'] is Timestamp
+          ? (data['createdAt'] as Timestamp).toDate()
+          : DateTime.now(),
     );
   }
 

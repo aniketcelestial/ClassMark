@@ -1,56 +1,68 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../shared/models/user_model.dart';
 import '../../../shared/services/auth_service.dart';
-import '../../../core/utils/logger.dart';
 
 final authServiceProvider = Provider<AuthService>((ref) => AuthService());
 
-// Tracks whether the initial Firebase auth check is complete
 final authReadyProvider = StateProvider<bool>((ref) => false);
 
+// Global cache — survives provider recreation during navigation
+UserModel? _cachedUser;
+
 final currentUserProvider =
-    StateNotifierProvider<CurrentUserNotifier, UserModel?>(
-  (ref) => CurrentUserNotifier(
-    ref.read(authServiceProvider),
-    ref,
-  ),
-);
+StateNotifierProvider<CurrentUserNotifier, UserModel?>((ref) {
+  return CurrentUserNotifier(ref.read(authServiceProvider), ref);
+});
 
 class CurrentUserNotifier extends StateNotifier<UserModel?> {
   final AuthService _authService;
   final Ref _ref;
 
-  CurrentUserNotifier(this._authService, this._ref) : super(null) {
-    _init();
+  CurrentUserNotifier(this._authService, this._ref) : super(_cachedUser) {
+    // Start with cached user immediately — no flicker, no null state
+    if (_cachedUser != null) {
+      debugPrint('>>> Provider recreated, restored from cache: ${_cachedUser?.name}');
+      _ref.read(authReadyProvider.notifier).state = true;
+    } else {
+      _init();
+    }
   }
 
   Future<void> _init() async {
+    debugPrint('>>> AUTH INIT STARTED');
     try {
-      // Wait for Firebase Auth to emit its first event
-      // This guarantees we know the real auth state before proceeding
-      final firebaseUser = await FirebaseAuth.instance
-          .authStateChanges()
-          .first
-          .timeout(
-            const Duration(seconds: 10),
-            onTimeout: () => null,
-          );
+      final firebaseUser = await Future.any([
+        FirebaseAuth.instance.authStateChanges().first,
+        Future.delayed(const Duration(seconds: 8), () => null),
+      ]);
 
       if (firebaseUser != null) {
-        appLogger.i('Restoring session for: ${firebaseUser.email}');
-        state = await _authService.getUserData(firebaseUser.uid);
-        appLogger.i('Session restored: ${state?.name} (${state?.role})');
+        debugPrint('>>> Restoring session: ${firebaseUser.email}');
+        try {
+          final user = await _authService
+              .getUserData(firebaseUser.uid)
+              .timeout(const Duration(seconds: 6));
+          state = user;
+          _cachedUser = user;
+          debugPrint('>>> Session restored: ${state?.name}, role=${state?.role}');
+        } catch (e) {
+          debugPrint('>>> getUserData failed: $e');
+          state = null;
+          _cachedUser = null;
+        }
       } else {
-        appLogger.i('No active session found');
+        debugPrint('>>> No active session');
         state = null;
+        _cachedUser = null;
       }
     } catch (e) {
-      appLogger.e('Auth init error: $e');
+      debugPrint('>>> Auth init error: $e');
       state = null;
     } finally {
-      // Signal splash screen that auth check is complete regardless
       _ref.read(authReadyProvider.notifier).state = true;
+      debugPrint('>>> authReady = true');
     }
   }
 
@@ -59,9 +71,10 @@ class CurrentUserNotifier extends StateNotifier<UserModel?> {
     required String password,
   }) async {
     try {
-      final user =
-          await _authService.signIn(email: email, password: password);
+      final user = await _authService.signIn(email: email, password: password);
       state = user;
+      _cachedUser = user;
+      debugPrint('>>> signIn: ${user?.name}, role=${user?.role}');
       return null;
     } catch (e) {
       return e.toString();
@@ -88,6 +101,8 @@ class CurrentUserNotifier extends StateNotifier<UserModel?> {
         className: className,
       );
       state = user;
+      _cachedUser = user;
+      debugPrint('>>> signUp: ${user.name}, role=${user.role}');
       return null;
     } catch (e) {
       return e.toString();
@@ -97,6 +112,8 @@ class CurrentUserNotifier extends StateNotifier<UserModel?> {
   Future<void> signOut() async {
     await _authService.signOut();
     state = null;
+    _cachedUser = null;
+    debugPrint('>>> signed out, cache cleared');
   }
 
   Future<String?> resetPassword(String email) async {

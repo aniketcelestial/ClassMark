@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/cupertino.dart';
 import '../models/user_model.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/utils/logger.dart';
@@ -76,8 +77,9 @@ class AuthService {
         return UserModel.fromFirestore(doc);
       }
       return null;
-    } catch (e) {
-      appLogger.e('Get user data error: $e');
+    } catch (e, stack) {
+      debugPrint("Firestore parsing failed: $e");
+      debugPrintStack(stackTrace: stack);
       return null;
     }
   }

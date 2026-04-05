@@ -1,14 +1,15 @@
 import 'dart:async';
+import 'package:classmark/shared/models/user_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../core/theme/app_theme.dart';
-import '../../../shared/widgets/animated_bg.dart';
-import '../../../shared/widgets/glass_card.dart';
-import '../../../shared/widgets/gradient_button.dart';
-import '../../auth/controllers/auth_controller.dart';
-import '../controllers/teacher_controller.dart';
+import 'package:classmark/core/theme/app_theme.dart';
+import 'package:classmark/shared/widgets/animated_bg.dart';
+import 'package:classmark/shared/widgets/glass_card.dart';
+import 'package:classmark/shared/widgets/gradient_button.dart';
+import 'package:classmark/features/auth/controllers/auth_controller.dart';
+import 'package:classmark/features/teacher/controllers/teacher_controller.dart';
 
 class GenerateOtpScreen extends ConsumerStatefulWidget {
   const GenerateOtpScreen({super.key});
@@ -53,9 +54,11 @@ class _GenerateOtpScreenState extends ConsumerState<GenerateOtpScreen> {
     });
   }
 
-  Future<void> _generateOtp() async {
-    final user = ref.read(currentUserProvider);
-    if (user == null) return;
+  Future<void> _generateOtp(UserModel user) async {
+    debugPrint('>>> _generateOtp() ENTERED');
+
+    debugPrint(
+        '>>> user=${user.name}, subject=${user.subject}, className=${user.className}');
 
     setState(() {
       _isGenerating = true;
@@ -63,17 +66,14 @@ class _GenerateOtpScreenState extends ConsumerState<GenerateOtpScreen> {
       _loadingStep = 'Requesting Bluetooth permission...';
     });
 
-    // Small delay so user sees the step message
-    await Future.delayed(const Duration(milliseconds: 300));
-    if (!mounted) return;
-    setState(() => _loadingStep = 'Reading Bluetooth Adapter Id...');
-
-    final error = await ref.read(activeSessionProvider.notifier).generateOtp(
-          teacherId: user.uid,
-          teacherName: user.name,
-          subject: user.subject ?? 'General',
-          className: user.className ?? 'Class',
-        );
+    final error = await ref
+        .read(activeSessionProvider.notifier)
+        .generateOtp(
+      teacherId: user.uid,
+      teacherName: user.name,
+      subject: user.subject ?? 'General',
+      className: user.className ?? 'Class',
+    );
 
     if (!mounted) return;
 
@@ -89,8 +89,12 @@ class _GenerateOtpScreenState extends ConsumerState<GenerateOtpScreen> {
         _loadingStep = '';
         _lastError = null;
       });
+
       final session = ref.read(activeSessionProvider);
-      if (session != null) _startCountdown(session.expiresAt);
+
+      if (session != null) {
+        _startCountdown(session.expiresAt);
+      }
     }
   }
 
@@ -106,6 +110,7 @@ class _GenerateOtpScreenState extends ConsumerState<GenerateOtpScreen> {
   @override
   Widget build(BuildContext context) {
     final session = ref.watch(activeSessionProvider);
+    final user = ref.watch(currentUserProvider);
     final hasActive =
         session != null && !session.isExpired && _secondsLeft > 0;
 
@@ -195,8 +200,8 @@ class _GenerateOtpScreenState extends ConsumerState<GenerateOtpScreen> {
                               const Divider(color: AppTheme.glassBorder),
                               _Row(
                                 Icons.bluetooth_rounded,
-                                'Bluetooth ID',
-                                session.teacherBluetoothId,
+                                'BLE Proximity',
+                                'Active — Students must be within ~20m',
                               ),
                             ],
                           ),
@@ -245,7 +250,9 @@ class _GenerateOtpScreenState extends ConsumerState<GenerateOtpScreen> {
                           ),
 
                         GradientButton(
-                          label: _isGenerating
+                          label: user == null
+                              ? 'Loading profile...'
+                              : _isGenerating
                               ? 'Getting Location...'
                               : 'Generate OTP Session',
                           colors: AppTheme.teacherGradient,
@@ -253,7 +260,12 @@ class _GenerateOtpScreenState extends ConsumerState<GenerateOtpScreen> {
                               ? null
                               : Icons.generating_tokens_rounded,
                           isLoading: _isGenerating,
-                          onPressed: _isGenerating ? null : _generateOtp,
+                          onPressed: (_isGenerating || user == null)
+                              ? null
+                              : () {
+                            debugPrint('>>> BUTTON PRESSED');
+                            _generateOtp(user);
+                          },
                         ),
                         const SizedBox(height: 16),
                         GlassCard(

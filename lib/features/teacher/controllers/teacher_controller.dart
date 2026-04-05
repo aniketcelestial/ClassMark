@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../shared/models/otp_session_model.dart';
 import '../../../shared/models/attendance_model.dart';
@@ -23,28 +24,31 @@ class ActiveSessionNotifier extends StateNotifier<OtpSession?> {
     required String className,
   }) async {
     try {
-      // Get teacher's Bluetooth address to store in session
-      final btResult = await BleService.getBluetoothAddress();
-      if (btResult.id == null) {
-        appLogger.e('BLE error: ${btResult.error}');
-        return btResult.error;
-      }
+      debugPrint('>>> GENERATE OTP CALLED');
 
-      appLogger.i('Creating OTP session. BT ID: ${btResult.id}');
+      final btResult = await BleService.getBluetoothAddress()
+          .timeout(const Duration(seconds: 5), onTimeout: () {
+        return (id: 'SESSION_${DateTime.now().millisecondsSinceEpoch}', error: null);
+      });
+
+      debugPrint('>>> BT result: ${btResult.id}');
 
       final session = await _otpService.createOtpSession(
         teacherId: teacherId,
         teacherName: teacherName,
         subject: subject,
         className: className,
-        bluetoothId: btResult.id!,
-      );
+        bluetoothId: btResult.id ?? 'SESSION_${DateTime.now().millisecondsSinceEpoch}',
+      ).timeout(const Duration(seconds: 10), onTimeout: () {
+        throw Exception('Firestore timeout — check internet connection');
+      });
 
       state = session;
-      appLogger.i('OTP generated: ${session.otp}');
+      debugPrint('>>> OTP generated: ${session.otp}');
       return null;
     } catch (e, stack) {
-      appLogger.e('Generate OTP error', error: e, stackTrace: stack);
+      debugPrint('>>> generateOtp ERROR: $e');
+      debugPrint('>>> $stack');
       return 'Error: ${e.toString()}';
     }
   }

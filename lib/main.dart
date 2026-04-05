@@ -34,9 +34,19 @@ void main() async {
   ));
 
   // Initialize Firebase
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  // Initialize Firebase
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    debugPrint('Firebase initialized successfully');
+  } on FirebaseException catch (e) {
+    if (e.code != 'duplicate-app') {
+      debugPrint('Firebase init FAILED: $e');
+    }
+  } catch (e) {
+    debugPrint('Firebase init error: $e');
+  }
 
   runApp(
     const ProviderScope(
