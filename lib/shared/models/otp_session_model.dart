@@ -9,6 +9,7 @@ class OtpSessionModel {
   final DateTime expiresAt;
   final bool isActive;
   final String subject;
+  final String teacherDeviceName;
 
   OtpSessionModel({
     required this.id,
@@ -19,6 +20,7 @@ class OtpSessionModel {
     required this.expiresAt,
     required this.isActive,
     required this.subject,
+    this.teacherDeviceName = '',
   });
 
   bool get isExpired => DateTime.now().isAfter(expiresAt);
@@ -33,6 +35,7 @@ class OtpSessionModel {
       expiresAt: (map['expiresAt'] as Timestamp).toDate(),
       isActive: map['isActive'] ?? false,
       subject: map['subject'] ?? '',
+      teacherDeviceName: map['teacherDeviceName'] ?? '',
     );
   }
 
@@ -45,6 +48,7 @@ class OtpSessionModel {
       'expiresAt': Timestamp.fromDate(expiresAt),
       'isActive': isActive,
       'subject': subject,
+      'teacherDeviceName': teacherDeviceName,
     };
   }
 }

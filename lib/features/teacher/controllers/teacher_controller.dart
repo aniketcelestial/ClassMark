@@ -12,14 +12,12 @@ final bleServiceProvider = Provider<BleService>((ref) {
   return service;
 });
 
-// Active OTP session watcher
 final activeSessionProvider = StreamProvider.family<OtpSessionModel?, String>(
       (ref, teacherId) {
     return ref.watch(otpServiceProvider).watchActiveSession(teacherId);
   },
 );
 
-// Present students watcher
 final presentStudentsProvider =
 StreamProvider.family<List<AttendanceModel>, String>(
       (ref, sessionId) {
@@ -40,11 +38,13 @@ class TeacherNotifier extends StateNotifier<AsyncValue<OtpSessionModel?>> {
   }) async {
     state = const AsyncValue.loading();
     try {
-      // Start BLE advertising so students can detect the teacher
-      await _bleService.startAdvertising();
+      // Get teacher's own Bluetooth device name
+      final deviceName = await _bleService.startAdvertising();
+
       final session = await _otpService.generateOtpSession(
         teacher: teacher,
         subject: subject,
+        teacherDeviceName: deviceName,
       );
       state = AsyncValue.data(session);
       return session;

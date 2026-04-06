@@ -17,6 +17,7 @@ class OtpService {
   Future<OtpSessionModel> generateOtpSession({
     required UserModel teacher,
     required String subject,
+    required String teacherDeviceName,
   }) async {
     // Deactivate previous sessions for this teacher
     final prev = await _firestore
@@ -32,32 +33,59 @@ class OtpService {
     await batch.commit();
 
     final now = DateTime.now();
-    final session = OtpSessionModel(
-      id: '',
-      teacherId: teacher.uid,
-      teacherName: teacher.name,
-      otp: _generateOtp(),
-      createdAt: now,
-      expiresAt: now.add(const Duration(minutes: AppConstants.otpExpiryMinutes)),
-      isActive: true,
-      subject: subject,
-    );
+    final otp = _generateOtp();
+
+    final sessionData = {
+      'teacherId': teacher.uid,
+      'teacherName': teacher.name,
+      'otp': otp,
+      'createdAt': Timestamp.fromDate(now),
+      'expiresAt': Timestamp.fromDate(
+        now.add(const Duration(minutes: AppConstants.otpExpiryMinutes)),
+      ),
+      'isActive': true,
+      'subject': subject,
+      'teacherDeviceName': teacherDeviceName,
+    };
 
     final ref = await _firestore
         .collection(AppConstants.otpSessionsCollection)
-        .add(session.toMap());
+        .add(sessionData);
 
-    appLogger.i('OTP session created: ${ref.id}');
+    appLogger.i('OTP session created: ${ref.id} | BT device: $teacherDeviceName');
+
     return OtpSessionModel(
       id: ref.id,
-      teacherId: session.teacherId,
-      teacherName: session.teacherName,
-      otp: session.otp,
-      createdAt: session.createdAt,
-      expiresAt: session.expiresAt,
-      isActive: session.isActive,
-      subject: session.subject,
+      teacherId: teacher.uid,
+      teacherName: teacher.name,
+      otp: otp,
+      createdAt: now,
+      expiresAt: now.add(
+        const Duration(minutes: AppConstants.otpExpiryMinutes),
+      ),
+      isActive: true,
+      subject: subject,
+      teacherDeviceName: teacherDeviceName,
     );
+  }
+
+  /// Soft lookup — fetch session by OTP without marking attendance
+  Future<OtpSessionModel?> getSessionByOtp(String otp) async {
+    final query = await _firestore
+        .collection(AppConstants.otpSessionsCollection)
+        .where('otp', isEqualTo: otp)
+        .where('isActive', isEqualTo: true)
+        .limit(1)
+        .get();
+
+    if (query.docs.isEmpty) return null;
+
+    final session = OtpSessionModel.fromMap(
+      query.docs.first.data(),
+      query.docs.first.id,
+    );
+
+    return session.isExpired ? null : session;
   }
 
   Future<OtpSessionModel?> validateAndSubmitOtp({
@@ -112,7 +140,7 @@ class OtpService {
         .collection(AppConstants.attendanceCollection)
         .add(attendance.toMap());
 
-    appLogger.i('Attendance marked for student: ${student.uid}');
+    appLogger.i('Attendance marked for: ${student.name}');
     return session;
   }
 
@@ -154,12 +182,16 @@ class OtpService {
     final query = await _firestore
         .collection(AppConstants.attendanceCollection)
         .where('studentId', isEqualTo: studentId)
-        .where('markedAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfMonth))
-        .where('markedAt', isLessThanOrEqualTo: Timestamp.fromDate(endOfMonth))
+        .where('markedAt',
+        isGreaterThanOrEqualTo: Timestamp.fromDate(startOfMonth))
+        .where('markedAt',
+        isLessThanOrEqualTo: Timestamp.fromDate(endOfMonth))
         .orderBy('markedAt', descending: true)
         .get();
 
-    return query.docs.map((d) => AttendanceModel.fromMap(d.data(), d.id)).toList();
+    return query.docs
+        .map((d) => AttendanceModel.fromMap(d.data(), d.id))
+        .toList();
   }
 
   Future<void> deactivateSession(String sessionId) async {

@@ -1,112 +1,143 @@
 import 'dart:async';
 import 'dart:io';
-import 'package:flutter/material.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
-import '../../core/constants/app_constants.dart';
 import '../../core/utils/logger.dart';
-import 'package:device_info_plus/device_info_plus.dart';
 
 enum BlePermissionStatus { granted, denied, permanentlyDenied }
 
 class BleService {
   StreamSubscription<List<ScanResult>>? _scanSubscription;
 
-  /// Request all required BLE permissions with proper rationale
+  // ─── Permissions ────────────────────────────────────────────────────────────
+
   Future<BlePermissionStatus> requestPermissions() async {
     if (Platform.isAndroid) {
       return await _requestAndroidPermissions();
     } else if (Platform.isIOS) {
       final status = await Permission.bluetooth.request();
-      if (status.isGranted) return BlePermissionStatus.granted;
       if (status.isPermanentlyDenied) return BlePermissionStatus.permanentlyDenied;
+      if (status.isGranted) return BlePermissionStatus.granted;
       return BlePermissionStatus.denied;
     }
     return BlePermissionStatus.granted;
   }
 
   Future<BlePermissionStatus> _requestAndroidPermissions() async {
-    // Android 12+ (API 31+)
-    if (await _isAndroid12OrAbove()) {
-      final statuses = await [
+    final isNew = await _isAndroid12OrAbove();
+
+    List<Permission> permissions;
+    if (isNew) {
+      permissions = [
         Permission.bluetoothScan,
         Permission.bluetoothConnect,
         Permission.bluetoothAdvertise,
-      ].request();
-
-      appLogger.d('BLE permissions status: $statuses');
-
-      final anyPermanentlyDenied = statuses.values
-          .any((s) => s == PermissionStatus.permanentlyDenied);
-      if (anyPermanentlyDenied) return BlePermissionStatus.permanentlyDenied;
-
-      final allGranted = statuses.values.every((s) => s.isGranted);
-      return allGranted
-          ? BlePermissionStatus.granted
-          : BlePermissionStatus.denied;
+      ];
     } else {
-      // Android 11 and below needs location
-      final statuses = await [
+      permissions = [
         Permission.bluetooth,
         Permission.location,
-      ].request();
-
-      final anyPermanentlyDenied = statuses.values
-          .any((s) => s == PermissionStatus.permanentlyDenied);
-      if (anyPermanentlyDenied) return BlePermissionStatus.permanentlyDenied;
-
-      final allGranted = statuses.values.every((s) => s.isGranted);
-      return allGranted
-          ? BlePermissionStatus.granted
-          : BlePermissionStatus.denied;
+      ];
     }
+
+    final statuses = await permissions.request();
+    appLogger.d('BLE permission statuses: $statuses');
+
+    if (statuses.values.any((s) => s.isPermanentlyDenied)) {
+      return BlePermissionStatus.permanentlyDenied;
+    }
+    if (statuses.values.every((s) => s.isGranted)) {
+      return BlePermissionStatus.granted;
+    }
+    return BlePermissionStatus.denied;
   }
 
   Future<bool> _isAndroid12OrAbove() async {
     if (!Platform.isAndroid) return false;
     try {
-      final deviceInfo = DeviceInfoPlugin();
-      final androidInfo = await deviceInfo.androidInfo;
-      appLogger.d('Android SDK version: ${androidInfo.version.sdkInt}');
-      return androidInfo.version.sdkInt >= 31;
-    } catch (e) {
-      appLogger.e('Could not get Android SDK version: $e');
-      // Default to Android 12+ behavior to be safe
-      return true;
+      final info = await DeviceInfoPlugin().androidInfo;
+      appLogger.d('Android SDK: ${info.version.sdkInt}');
+      return info.version.sdkInt >= 31;
+    } catch (_) {
+      return true; // assume new
     }
   }
+
+  // ─── Bluetooth state ─────────────────────────────────────────────────────────
 
   Future<bool> isBluetoothOn() async {
     final state = await FlutterBluePlus.adapterState.first;
     return state == BluetoothAdapterState.on;
   }
 
-  /// Enable bluetooth programmatically (Android only)
   Future<void> turnOnBluetooth() async {
     if (Platform.isAndroid) {
-      await FlutterBluePlus.turnOn();
+      try {
+        await FlutterBluePlus.turnOn();
+        await Future.delayed(const Duration(seconds: 2));
+      } catch (e) {
+        appLogger.e('Could not turn on BT: $e');
+      }
     }
   }
 
-  Future<bool> startAdvertising() async {
-    appLogger.i('BLE: Teacher device is now discoverable as ClassMark-Teacher');
-    return true;
+  // ─── Get this device's Bluetooth name ────────────────────────────────────────
+
+  Future<String> getDeviceName() async {
+    try {
+      // Get the phone's own Bluetooth adapter name
+      final adapterName = await FlutterBluePlus.adapterName;
+      appLogger.i('This device BT name: $adapterName');
+      return adapterName;
+    } catch (e) {
+      appLogger.e('Could not get device name: $e');
+      // Fallback to Android device name
+      if (Platform.isAndroid) {
+        final info = await DeviceInfoPlugin().androidInfo;
+        return info.model;
+      }
+      return 'Unknown';
+    }
+  }
+
+  // ─── Teacher side ─────────────────────────────────────────────────────────────
+
+  /// Teacher calls this — returns their BT device name to save in Firestore
+  Future<String> startAdvertising() async {
+    final permStatus = await requestPermissions();
+    if (permStatus != BlePermissionStatus.granted) {
+      throw BlePermissionException(
+        'Bluetooth permission required.',
+        isPermanentlyDenied: permStatus == BlePermissionStatus.permanentlyDenied,
+      );
+    }
+
+    final btOn = await isBluetoothOn();
+    if (!btOn) await turnOnBluetooth();
+
+    final name = await getDeviceName();
+    appLogger.i('Teacher advertising as: $name');
+    return name; // This name is saved to Firestore with the OTP session
   }
 
   Future<void> stopAdvertising() async {
-    appLogger.i('BLE: Teacher stopped advertising');
+    appLogger.i('Teacher stopped advertising');
   }
 
-  /// Full proximity check with proper permission handling
-  /// Returns RSSI value if teacher found, throws detailed exception otherwise
-  Future<double> scanForTeacherRssi({
-    Duration timeout = const Duration(seconds: 10),
+  // ─── Student side ─────────────────────────────────────────────────────────────
+
+  /// Student scans for teacher's device by name fetched from Firestore
+  /// [teacherDeviceName] — the BT name saved when teacher generated OTP
+  Future<bool> isStudentNearTeacher({
+    required String teacherDeviceName,
+    Duration timeout = const Duration(seconds: 12),
   }) async {
-    // Check permissions
+    // 1. Permissions
     final permStatus = await requestPermissions();
     if (permStatus == BlePermissionStatus.permanentlyDenied) {
       throw BlePermissionException(
-        'Bluetooth permission permanently denied. Please enable it in app settings.',
+        'Bluetooth permission permanently denied. Please enable it in App Settings.',
         isPermanentlyDenied: true,
       );
     }
@@ -117,76 +148,69 @@ class BleService {
       );
     }
 
-    // Check if bluetooth is on
+    // 2. Bluetooth on
     final btOn = await isBluetoothOn();
     if (!btOn) {
-      try {
-        await turnOnBluetooth();
-        await Future.delayed(const Duration(seconds: 1));
-        final btOnNow = await isBluetoothOn();
-        if (!btOnNow) {
-          throw const BleBluetoothOffException(
-            'Bluetooth is turned off. Please enable Bluetooth to verify proximity.',
-          );
-        }
-      } catch (e) {
-        if (e is BleBluetoothOffException) rethrow;
+      await turnOnBluetooth();
+      final btOnNow = await isBluetoothOn();
+      if (!btOnNow) {
         throw const BleBluetoothOffException(
           'Please turn on Bluetooth to verify proximity.',
         );
       }
     }
 
-    double? bestRssi;
-    final completer = Completer<double>();
+    appLogger.i('Scanning for teacher device: "$teacherDeviceName"');
 
+    final completer = Completer<bool>();
+    double? bestRssi;
+
+    // 3. Scan
     try {
       await FlutterBluePlus.startScan(timeout: timeout);
     } catch (e) {
-      appLogger.e('BLE scan start error: $e');
-      throw Exception('Failed to start Bluetooth scan. Please try again.');
+      throw Exception('Failed to start Bluetooth scan: $e');
     }
 
-    _scanSubscription = FlutterBluePlus.scanResults.listen(
-          (results) {
-        for (final result in results) {
-          final name = result.device.platformName.toLowerCase();
-          appLogger.d(
-            'Found BLE device: "${result.device.platformName}" RSSI: ${result.rssi}',
-          );
+    _scanSubscription = FlutterBluePlus.scanResults.listen((results) {
+      for (final r in results) {
+        final foundName = r.device.platformName;
+        final rssi = r.rssi;
 
-          if (name.contains('classmark') ||
-              name.contains('attendx') ||
-              name.contains('attend-x') ||
-              name.contains('classmark-teacher')) {
-            final rssi = result.rssi.toDouble();
-            if (bestRssi == null || rssi > bestRssi!) {
-              bestRssi = rssi;
-            }
-            if (!completer.isCompleted) {
-              completer.complete(rssi);
-            }
+        appLogger.d('BLE found: "$foundName" RSSI: $rssi');
+
+        // Match teacher device name (case-insensitive, partial match)
+        final teacherLower = teacherDeviceName.toLowerCase().trim();
+        final foundLower = foundName.toLowerCase().trim();
+
+        final isMatch = foundLower == teacherLower ||
+            foundLower.contains(teacherLower) ||
+            teacherLower.contains(foundLower);
+
+        if (isMatch) {
+          appLogger.i('✅ Teacher device found! "$foundName" RSSI: $rssi');
+          if (bestRssi == null || rssi > bestRssi!) {
+            bestRssi = rssi.toDouble();
+          }
+          if (!completer.isCompleted) {
+            // RSSI threshold: -80 dBm ≈ ~15m, -70 dBm ≈ ~10m
+            // Using -80 to be slightly lenient with walls/obstacles
+            completer.complete(rssi >= -80);
           }
         }
-      },
-      onError: (e) {
-        if (!completer.isCompleted) {
-          completer.completeError(
-            Exception('Bluetooth scan error: $e'),
-          );
-        }
-      },
-    );
+      }
+    });
 
-    // Timeout fallback
-    Future.delayed(timeout + const Duration(seconds: 1), () {
+    // Timeout
+    Future.delayed(timeout + const Duration(seconds: 2), () {
       if (!completer.isCompleted) {
         if (bestRssi != null) {
-          completer.complete(bestRssi!);
+          completer.complete(bestRssi! >= -80);
         } else {
           completer.completeError(
-            const BleTeacherNotFoundException(
-              "Teacher's device not found nearby. Make sure you're within 10 meters and teacher's Bluetooth is ON.",
+            BleTeacherNotFoundException(
+              'Teacher\'s device ("$teacherDeviceName") not found nearby.\n'
+                  'Make sure both Bluetooth are ON and you are within 10 meters.',
             ),
           );
         }
@@ -194,21 +218,13 @@ class BleService {
     });
 
     try {
-      final rssi = await completer.future;
+      final result = await completer.future;
       await stopScan();
-      return rssi;
+      return result;
     } catch (e) {
       await stopScan();
       rethrow;
     }
-  }
-
-  Future<bool> isStudentNearTeacher() async {
-    final rssi = await scanForTeacherRssi();
-    appLogger.i(
-      'BLE RSSI: $rssi (threshold: ${AppConstants.bleProximityThreshold})',
-    );
-    return rssi >= AppConstants.bleProximityThreshold;
   }
 
   Future<void> stopScan() async {
@@ -226,12 +242,12 @@ class BleService {
   }
 }
 
-// Custom BLE exceptions for precise error handling
+// ─── Custom Exceptions ────────────────────────────────────────────────────────
+
 class BlePermissionException implements Exception {
   final String message;
   final bool isPermanentlyDenied;
-  const BlePermissionException(this.message,
-      {required this.isPermanentlyDenied});
+  const BlePermissionException(this.message, {required this.isPermanentlyDenied});
   @override
   String toString() => message;
 }

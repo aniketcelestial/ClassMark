@@ -1,3 +1,4 @@
+import 'package:classmark/core/utils/logger.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../shared/models/attendance_model.dart';
 import '../../../shared/models/otp_session_model.dart';
@@ -71,16 +72,39 @@ class StudentNotifier extends StateNotifier<StudentSubmitState> {
       if (!skipBle) {
         state = state.copyWith(isScanning: true);
         try {
-          final isNear = await _bleService.isStudentNearTeacher();
-          state = state.copyWith(isScanning: false);
-          if (!isNear) {
+          // Soft lookup to get teacher's BT device name
+          final session = await _otpService.getSessionByOtp(otp);
+
+          if (session == null) {
             state = state.copyWith(
               isLoading: false,
-              error:
-              "You're too far from the teacher. Move within 10 meters and try again.",
+              isScanning: false,
+              error: 'Invalid or expired OTP. Please check and try again.',
             );
             return false;
           }
+
+          final deviceName = session.teacherDeviceName;
+
+          if (deviceName.isEmpty) {
+            // Session exists but no BT name saved — skip BLE check
+            appLogger.w('No teacher device name in session, skipping BLE check.');
+          } else {
+            final isNear = await _bleService.isStudentNearTeacher(
+              teacherDeviceName: deviceName,
+            );
+            state = state.copyWith(isScanning: false);
+
+            if (!isNear) {
+              state = state.copyWith(
+                isLoading: false,
+                error: "You're too far from the teacher. Move within 10 meters and try again.",
+              );
+              return false;
+            }
+          }
+
+          state = state.copyWith(isScanning: false);
         } on BlePermissionException catch (e) {
           state = state.copyWith(
             isLoading: false,
