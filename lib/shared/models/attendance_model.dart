@@ -1,40 +1,39 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-class AttendanceRecord {
+class AttendanceModel {
   final String id;
   final String studentId;
   final String studentName;
+  final String enrollmentNumber;
   final String teacherId;
+  final String otpSessionId;
   final String subject;
-  final String className;
-  final String sessionId;
   final DateTime markedAt;
-  final double distanceFromTeacher; // BLE RSSI-estimated metres
+  final bool isPresent;
 
-  const AttendanceRecord({
+  AttendanceModel({
     required this.id,
     required this.studentId,
     required this.studentName,
+    required this.enrollmentNumber,
     required this.teacherId,
+    required this.otpSessionId,
     required this.subject,
-    required this.className,
-    required this.sessionId,
     required this.markedAt,
-    required this.distanceFromTeacher,
+    this.isPresent = true,
   });
 
-  factory AttendanceRecord.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
-    return AttendanceRecord(
-      id: doc.id,
-      studentId: data['studentId'] ?? '',
-      studentName: data['studentName'] ?? '',
-      teacherId: data['teacherId'] ?? '',
-      subject: data['subject'] ?? '',
-      className: data['className'] ?? '',
-      sessionId: data['sessionId'] ?? '',
-      markedAt: (data['markedAt'] as Timestamp).toDate(),
-      distanceFromTeacher: (data['distanceFromTeacher'] ?? 0.0).toDouble(),
+  factory AttendanceModel.fromMap(Map<String, dynamic> map, String id) {
+    return AttendanceModel(
+      id: id,
+      studentId: map['studentId'] ?? '',
+      studentName: map['studentName'] ?? '',
+      enrollmentNumber: map['enrollmentNumber'] ?? '',
+      teacherId: map['teacherId'] ?? '',
+      otpSessionId: map['otpSessionId'] ?? '',
+      subject: map['subject'] ?? '',
+      markedAt: (map['markedAt'] as Timestamp).toDate(),
+      isPresent: map['isPresent'] ?? true,
     );
   }
 
@@ -42,12 +41,12 @@ class AttendanceRecord {
     return {
       'studentId': studentId,
       'studentName': studentName,
+      'enrollmentNumber': enrollmentNumber,
       'teacherId': teacherId,
+      'otpSessionId': otpSessionId,
       'subject': subject,
-      'className': className,
-      'sessionId': sessionId,
       'markedAt': Timestamp.fromDate(markedAt),
-      'distanceFromTeacher': distanceFromTeacher,
+      'isPresent': isPresent,
     };
   }
 }

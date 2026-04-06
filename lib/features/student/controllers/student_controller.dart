@@ -1,83 +1,137 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../shared/models/attendance_model.dart';
-import '../../../shared/services/otp_service.dart';
+import '../../../shared/models/otp_session_model.dart';
+import '../../../shared/models/user_model.dart';
 import '../../../shared/services/ble_service.dart';
-import '../../../core/utils/logger.dart';
+import '../../../shared/services/otp_service.dart';
 import '../../teacher/controllers/teacher_controller.dart';
 
-enum OtpSubmitResult {
-  success,
-  invalidOtp,
-  expired,
-  outOfRange,
-  bluetoothError,
-  alreadyMarked,
-  error,
-}
+final monthlyAttendanceProvider =
+FutureProvider.family<List<AttendanceModel>, Map<String, dynamic>>(
+      (ref, args) async {
+    return ref.watch(otpServiceProvider).getMonthlyAttendance(
+      studentId: args['studentId'] as String,
+      year: args['year'] as int,
+      month: args['month'] as int,
+    );
+  },
+);
 
-final studentControllerProvider = Provider<StudentController>(
-        (ref) => StudentController(ref.read(otpServiceProvider)));
+class StudentSubmitState {
+  final bool isLoading;
+  final bool isScanning;
+  final String? error;
+  final bool isPermanentlyDenied;
+  final bool isBluetoothOff;
+  final OtpSessionModel? successSession;
 
-class StudentController {
-  final OtpService _otpService;
-  StudentController(this._otpService);
+  const StudentSubmitState({
+    this.isLoading = false,
+    this.isScanning = false,
+    this.error,
+    this.isPermanentlyDenied = false,
+    this.isBluetoothOff = false,
+    this.successSession,
+  });
 
-  Future<OtpSubmitResult> submitOtp({
-    required String otp,
-    required String studentId,
-    required String studentName,
-  }) async {
-    try {
-      // 1. Validate OTP exists and is active
-      final session = await _otpService.validateOtp(otp);
-      if (session == null) return OtpSubmitResult.invalidOtp;
-      if (session.isExpired) return OtpSubmitResult.expired;
-
-      // 2. Check already marked
-      final alreadyMarked = await _otpService.hasStudentMarkedAttendance(
-        studentId: studentId,
-        sessionId: session.id,
-      );
-      if (alreadyMarked) return OtpSubmitResult.alreadyMarked;
-
-      // 3. BLE proximity check
-      appLogger.i('Scanning for teacher BT: ${session.teacherBluetoothId}');
-      final bleResult = await BleService.checkProximityToTeacher(
-        teacherBluetoothId: session.teacherBluetoothId,
-      );
-
-      if (bleResult.error != null && bleResult.meters == null) {
-        // Device not found at all
-        appLogger.w('BLE proximity error: ${bleResult.error}');
-        return OtpSubmitResult.outOfRange;
-      }
-
-      if (!bleResult.inRange) {
-        appLogger.w(
-            'Student out of range: ${bleResult.meters?.toStringAsFixed(1)}m');
-        return OtpSubmitResult.outOfRange;
-      }
-
-      // 4. Mark attendance
-      final record = AttendanceRecord(
-        id: '',
-        studentId: studentId,
-        studentName: studentName,
-        teacherId: session.teacherId,
-        subject: session.subject,
-        className: session.className,
-        sessionId: session.id,
-        markedAt: DateTime.now(),
-        distanceFromTeacher: bleResult.meters ?? 0.0,
-      );
-
-      await _otpService.markAttendance(record);
-      appLogger.i(
-          'Attendance marked! BLE distance: ${bleResult.meters?.toStringAsFixed(1)}m');
-      return OtpSubmitResult.success;
-    } catch (e, stack) {
-      appLogger.e('submitOtp error', error: e, stackTrace: stack);
-      return OtpSubmitResult.error;
-    }
+  StudentSubmitState copyWith({
+    bool? isLoading,
+    bool? isScanning,
+    String? error,
+    bool? isPermanentlyDenied,
+    bool? isBluetoothOff,
+    OtpSessionModel? successSession,
+  }) {
+    return StudentSubmitState(
+      isLoading: isLoading ?? this.isLoading,
+      isScanning: isScanning ?? this.isScanning,
+      error: error,
+      isPermanentlyDenied: isPermanentlyDenied ?? this.isPermanentlyDenied,
+      isBluetoothOff: isBluetoothOff ?? this.isBluetoothOff,
+      successSession: successSession ?? this.successSession,
+    );
   }
 }
+
+class StudentNotifier extends StateNotifier<StudentSubmitState> {
+  final OtpService _otpService;
+  final BleService _bleService;
+
+  StudentNotifier(this._otpService, this._bleService)
+      : super(const StudentSubmitState());
+
+  Future<bool> submitOtp({
+    required String otp,
+    required UserModel student,
+    bool skipBle = false,
+  }) async {
+    state = const StudentSubmitState(isLoading: true);
+
+    try {
+      if (!skipBle) {
+        state = state.copyWith(isScanning: true);
+        try {
+          final isNear = await _bleService.isStudentNearTeacher();
+          state = state.copyWith(isScanning: false);
+          if (!isNear) {
+            state = state.copyWith(
+              isLoading: false,
+              error:
+              "You're too far from the teacher. Move within 10 meters and try again.",
+            );
+            return false;
+          }
+        } on BlePermissionException catch (e) {
+          state = state.copyWith(
+            isLoading: false,
+            isScanning: false,
+            error: e.message,
+            isPermanentlyDenied: e.isPermanentlyDenied,
+          );
+          return false;
+        } on BleBluetoothOffException catch (e) {
+          state = state.copyWith(
+            isLoading: false,
+            isScanning: false,
+            error: e.message,
+            isBluetoothOff: true,
+          );
+          return false;
+        } on BleTeacherNotFoundException catch (e) {
+          state = state.copyWith(
+            isLoading: false,
+            isScanning: false,
+            error: e.message,
+          );
+          return false;
+        }
+      }
+
+      final session = await _otpService.validateAndSubmitOtp(
+        otp: otp,
+        student: student,
+      );
+
+      state = StudentSubmitState(successSession: session);
+      return true;
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        isScanning: false,
+        error: e.toString().replaceAll('Exception: ', ''),
+      );
+      return false;
+    }
+  }
+
+  void clearError() => state = state.copyWith(error: null);
+  void clearSuccess() => state = const StudentSubmitState();
+}
+
+final studentNotifierProvider =
+StateNotifierProvider<StudentNotifier, StudentSubmitState>((ref) {
+  return StudentNotifier(
+    ref.watch(otpServiceProvider),
+    ref.watch(bleServiceProvider),
+  );
+});

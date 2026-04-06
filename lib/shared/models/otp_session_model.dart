@@ -1,43 +1,38 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-class OtpSession {
+class OtpSessionModel {
   final String id;
   final String teacherId;
   final String teacherName;
-  final String subject;
-  final String className;
   final String otp;
-  final String teacherBluetoothId;
   final DateTime createdAt;
   final DateTime expiresAt;
   final bool isActive;
+  final String subject;
 
-  const OtpSession({
+  OtpSessionModel({
     required this.id,
     required this.teacherId,
     required this.teacherName,
-    required this.subject,
-    required this.className,
     required this.otp,
-    required this.teacherBluetoothId,
     required this.createdAt,
     required this.expiresAt,
     required this.isActive,
+    required this.subject,
   });
 
-  factory OtpSession.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
-    return OtpSession(
-      id: doc.id,
-      teacherId: data['teacherId'] ?? '',
-      teacherName: data['teacherName'] ?? '',
-      subject: data['subject'] ?? '',
-      className: data['className'] ?? '',
-      otp: data['otp'] ?? '',
-      teacherBluetoothId: data['teacherBluetoothId'] ?? '',
-      createdAt: (data['createdAt'] as Timestamp).toDate(),
-      expiresAt: (data['expiresAt'] as Timestamp).toDate(),
-      isActive: data['isActive'] ?? false,
+  bool get isExpired => DateTime.now().isAfter(expiresAt);
+
+  factory OtpSessionModel.fromMap(Map<String, dynamic> map, String id) {
+    return OtpSessionModel(
+      id: id,
+      teacherId: map['teacherId'] ?? '',
+      teacherName: map['teacherName'] ?? '',
+      otp: map['otp'] ?? '',
+      createdAt: (map['createdAt'] as Timestamp).toDate(),
+      expiresAt: (map['expiresAt'] as Timestamp).toDate(),
+      isActive: map['isActive'] ?? false,
+      subject: map['subject'] ?? '',
     );
   }
 
@@ -45,15 +40,11 @@ class OtpSession {
     return {
       'teacherId': teacherId,
       'teacherName': teacherName,
-      'subject': subject,
-      'className': className,
       'otp': otp,
-      'teacherBluetoothId': teacherBluetoothId,
       'createdAt': Timestamp.fromDate(createdAt),
       'expiresAt': Timestamp.fromDate(expiresAt),
       'isActive': isActive,
+      'subject': subject,
     };
   }
-
-  bool get isExpired => DateTime.now().isAfter(expiresAt);
 }

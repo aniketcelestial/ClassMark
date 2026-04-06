@@ -1,7 +1,7 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../../core/constants/app_routes.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/animated_bg.dart';
@@ -14,151 +14,141 @@ class SplashScreen extends ConsumerStatefulWidget {
   ConsumerState<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends ConsumerState<SplashScreen> {
-  bool _navigated = false;
+class _SplashScreenState extends ConsumerState<SplashScreen>
+    with TickerProviderStateMixin {
+  late AnimationController _logoCtrl;
+  late AnimationController _textCtrl;
+  late Animation<double> _logoScale;
+  late Animation<double> _logoOpacity;
+  late Animation<double> _textOpacity;
+  late Animation<Offset> _textSlide;
 
   @override
   void initState() {
     super.initState();
 
-    Future.microtask(() {
-      ref.read(currentUserProvider);
-    });
+    _logoCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    );
+    _textCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+    );
+
+    _logoScale = Tween<double>(begin: 0.5, end: 1.0).animate(
+      CurvedAnimation(parent: _logoCtrl, curve: Curves.elasticOut),
+    );
+    _logoOpacity = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(parent: _logoCtrl, curve: const Interval(0, 0.5)),
+    );
+    _textOpacity = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(parent: _textCtrl, curve: Curves.easeOut),
+    );
+    _textSlide = Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero)
+        .animate(CurvedAnimation(parent: _textCtrl, curve: Curves.easeOut));
+
+    _startAnimation();
   }
 
-  void _navigate() {
-    if (_navigated || !mounted) return;
-    _navigated = true;
+  Future<void> _startAnimation() async {
+    await Future.delayed(const Duration(milliseconds: 300));
+    _logoCtrl.forward();
+    await Future.delayed(const Duration(milliseconds: 600));
+    _textCtrl.forward();
+    await Future.delayed(const Duration(milliseconds: 1500));
+    _navigate();
+  }
 
-    final firebaseUser = FirebaseAuth.instance.currentUser;
+  void _navigate() async {
+    try {
+      final authService = ref.read(authServiceProvider);
+      final user = await authService.getCurrentUserModel();
+      if (!mounted) return;
 
-    if (firebaseUser != null) {
-      final user = ref.read(currentUserProvider);
-
-      if (user?.role == 'teacher') {
-        Navigator.pushReplacementNamed(
-          context,
-          AppRoutes.teacherDashboard,
-        );
-      } else if (user?.role == 'student') {
-        Navigator.pushReplacementNamed(
-          context,
-          AppRoutes.studentDashboard,
-        );
+      if (user == null) {
+        context.go(AppRoutes.roleSelect);
+      } else if (user.role == AppConstants.roleTeacher) {
+        context.go(AppRoutes.teacherDashboard, extra: user);
       } else {
-        Navigator.pushReplacementNamed(
-          context,
-          AppRoutes.roleSelect,
-        );
+        context.go(AppRoutes.studentDashboard, extra: user);
       }
-    } else {
-      Navigator.pushReplacementNamed(
-        context,
-        AppRoutes.roleSelect,
-      );
+    } catch (e) {
+      if (mounted) context.go(AppRoutes.roleSelect);
     }
   }
+
+  @override
+  void dispose() {
+    _logoCtrl.dispose();
+    _textCtrl.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Watch authReady — when it flips to true, navigate
-    final authReady = ref.watch(authReadyProvider);
-    Future.delayed(const Duration(seconds: 4), () {
-      if (!_navigated && mounted) {
-        _navigate();
-      }
-    });
-
-
     return Scaffold(
-      body: AnimatedMeshBackground(
-        colors: const [
-          AppTheme.primaryBlue,
-          AppTheme.primaryPurple,
-          AppTheme.accentCyan,
-        ],
+      body: AnimatedBg(
         child: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Logo
-              Container(
-                width: 100,
-                height: 100,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(28),
-                  gradient: const LinearGradient(
-                    colors: AppTheme.teacherGradient,
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppTheme.primaryBlue.withOpacity(0.5),
-                      blurRadius: 30,
-                      offset: const Offset(0, 10),
+              ScaleTransition(
+                scale: _logoScale,
+                child: FadeTransition(
+                  opacity: _logoOpacity,
+                  child: Container(
+                    width: 100,
+                    height: 100,
+                    decoration: BoxDecoration(
+                      gradient: AppColors.primaryGradient,
+                      borderRadius: BorderRadius.circular(28),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withOpacity(0.4),
+                          blurRadius: 30,
+                          spreadRadius: 0,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
                     ),
-                  ],
+                    child: const Icon(
+                      Icons.qr_code_2_rounded,
+                      color: Colors.white,
+                      size: 54,
+                    ),
+                  ),
                 ),
-                child: const Icon(Icons.school_rounded,
-                    color: Colors.white, size: 52),
-              )
-                  .animate()
-                  .fadeIn(duration: 600.ms)
-                  .scale(
-                      begin: const Offset(0.5, 0.5),
-                      curve: Curves.elasticOut),
-
+              ),
               const SizedBox(height: 28),
-
-              // App name with gradient
-              ShaderMask(
-                shaderCallback: (bounds) => const LinearGradient(
-                  colors: [
-                    AppTheme.primaryBlue,
-                    AppTheme.primaryPurple,
-                  ],
-                ).createShader(bounds),
-                child: const Text(
-                  'ClassMark',
-                  style: TextStyle(
-                    fontSize: 42,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white, // overridden by shader
-                    letterSpacing: -1,
+              SlideTransition(
+                position: _textSlide,
+                child: FadeTransition(
+                  opacity: _textOpacity,
+                  child: Column(
+                    children: [
+                      Text(
+                        AppConstants.appName,
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 38,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.5,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Smart Attendance System',
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 15,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              )
-                  .animate(delay: 300.ms)
-                  .fadeIn(duration: 500.ms)
-                  .slideY(begin: 0.3, curve: Curves.easeOut),
-
-              const SizedBox(height: 8),
-
-              const Text(
-                'Smart Attendance, Simplified',
-                style: TextStyle(
-                  fontSize: 15,
-                  color: AppTheme.textSecondary,
-                  letterSpacing: 0.5,
-                ),
-              ).animate(delay: 500.ms).fadeIn(duration: 500.ms),
-
-              const SizedBox(height: 64),
-
-              // Show spinner while waiting for auth
-              if (!authReady)
-                SizedBox(
-                  width: 28,
-                  height: 28,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.5,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      AppTheme.primaryBlue.withOpacity(0.7),
-                    ),
-                  ),
-                ).animate(delay: 800.ms).fadeIn()
-              else
-                const SizedBox(height: 28),
+              ),
             ],
           ),
         ),

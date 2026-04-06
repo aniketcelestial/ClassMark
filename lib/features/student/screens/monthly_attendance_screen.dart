@@ -1,17 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../shared/models/attendance_model.dart';
-import '../../../shared/services/otp_service.dart';
+import '../../../shared/models/user_model.dart';
 import '../../../shared/widgets/animated_bg.dart';
 import '../../../shared/widgets/glass_card.dart';
-import '../../auth/controllers/auth_controller.dart';
-import '../../teacher/controllers/teacher_controller.dart';
+import '../controllers/student_controller.dart';
 
 class MonthlyAttendanceScreen extends ConsumerStatefulWidget {
-  const MonthlyAttendanceScreen({super.key});
+  final UserModel student;
+  const MonthlyAttendanceScreen({super.key, required this.student});
 
   @override
   ConsumerState<MonthlyAttendanceScreen> createState() =>
@@ -21,204 +20,298 @@ class MonthlyAttendanceScreen extends ConsumerStatefulWidget {
 class _MonthlyAttendanceScreenState
     extends ConsumerState<MonthlyAttendanceScreen> {
   DateTime _selectedMonth = DateTime.now();
-  List<AttendanceRecord> _records = [];
-  bool _loading = true;
-  String? _error;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadAttendance();
-  }
-
-  Future<void> _loadAttendance() async {
-    final user = ref.read(currentUserProvider);
-    if (user == null) {
-      setState(() { _loading = false; _error = 'Not logged in.'; });
-      return;
-    }
-
-    setState(() { _loading = true; _error = null; });
-
-    try {
-      final service = ref.read(otpServiceProvider);
-      final records = await service.getStudentMonthlyAttendance(
-        studentId: user.uid,
-        month: _selectedMonth,
-      );
-      if (mounted) {
-        setState(() { _records = records; _loading = false; });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = e.toString();
-          _loading = false;
-        });
-      }
-    }
-  }
 
   void _previousMonth() {
     setState(() {
-      _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month - 1);
+      _selectedMonth = DateTime(
+        _selectedMonth.year,
+        _selectedMonth.month - 1,
+      );
     });
-    _loadAttendance();
   }
 
   void _nextMonth() {
     final now = DateTime.now();
-    if (_selectedMonth.year < now.year ||
-        (_selectedMonth.year == now.year &&
-            _selectedMonth.month < now.month)) {
-      setState(() {
-        _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1);
-      });
-      _loadAttendance();
+    if (_selectedMonth.year == now.year && _selectedMonth.month == now.month) {
+      return;
     }
-  }
-
-  bool get _isCurrentMonth {
-    final now = DateTime.now();
-    return _selectedMonth.year == now.year &&
-        _selectedMonth.month == now.month;
+    setState(() {
+      _selectedMonth = DateTime(
+        _selectedMonth.year,
+        _selectedMonth.month + 1,
+      );
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    final attendanceAsync = ref.watch(monthlyAttendanceProvider({
+      'studentId': widget.student.uid,
+      'year': _selectedMonth.year,
+      'month': _selectedMonth.month,
+    }));
+
     return Scaffold(
-      body: AnimatedMeshBackground(
-        colors: const [AppTheme.primaryPurple, AppTheme.primaryBlue],
+      body: AnimatedBg(
         child: SafeArea(
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // AppBar
               Padding(
-                padding: const EdgeInsets.fromLTRB(8, 12, 24, 0),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                 child: Row(
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.arrow_back_ios_new_rounded,
-                          color: AppTheme.textPrimary),
-                      onPressed: () => Navigator.pop(context),
+                      onPressed: () => context.pop(),
+                      icon: const Icon(Icons.arrow_back_ios_rounded,
+                          color: AppColors.textSecondary),
                     ),
-                    const Expanded(
-                      child: Text(
-                        'My Attendance',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            color: AppTheme.textPrimary),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'My Attendance',
+                      style: TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700,
                       ),
-                    ),
-                    // Refresh button
-                    IconButton(
-                      icon: const Icon(Icons.refresh_rounded,
-                          color: AppTheme.textSecondary),
-                      onPressed: _loading ? null : _loadAttendance,
                     ),
                   ],
                 ),
               ),
 
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Column(
+              // Month selector
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: GlassCard(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const SizedBox(height: 20),
+                      IconButton(
+                        onPressed: _previousMonth,
+                        icon: const Icon(Icons.chevron_left_rounded,
+                            color: AppColors.textSecondary),
+                      ),
+                      Text(
+                        DateFormat('MMMM yyyy').format(_selectedMonth),
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: _nextMonth,
+                        icon: Icon(
+                          Icons.chevron_right_rounded,
+                          color: _selectedMonth.month == DateTime.now().month &&
+                              _selectedMonth.year == DateTime.now().year
+                              ? AppColors.textHint
+                              : AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
 
-                      // Month selector
-                      GlassCard(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 8),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              const SizedBox(height: 16),
+
+              // Stats
+              attendanceAsync.when(
+                data: (records) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: GlassCard(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              children: [
+                                Text(
+                                  '${records.length}',
+                                  style: const TextStyle(
+                                    color: AppColors.primary,
+                                    fontSize: 32,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                const Text(
+                                  'Classes Attended',
+                                  style: TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: GlassCard(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              children: [
+                                // Group by subject
+                                Text(
+                                  '${records.map((r) => r.subject).toSet().length}',
+                                  style: const TextStyle(
+                                    color: AppColors.accent,
+                                    fontSize: 32,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                const Text(
+                                  'Subjects',
+                                  style: TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+                loading: () => const SizedBox.shrink(),
+                error: (_, __) => const SizedBox.shrink(),
+              ),
+
+              const SizedBox(height: 16),
+
+              // Records List
+              Expanded(
+                child: attendanceAsync.when(
+                  data: (records) {
+                    if (records.isEmpty) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            IconButton(
-                              onPressed: _loading ? null : _previousMonth,
-                              icon: const Icon(Icons.chevron_left_rounded,
-                                  color: AppTheme.textPrimary),
+                            Container(
+                              width: 80,
+                              height: 80,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.05),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.event_busy_rounded,
+                                color: AppColors.textSecondary,
+                                size: 40,
+                              ),
                             ),
-                            Text(
-                              DateFormat('MMMM yyyy').format(_selectedMonth),
-                              style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppTheme.textPrimary),
+                            const SizedBox(height: 20),
+                            const Text(
+                              'No attendance records',
+                              style: TextStyle(
+                                color: AppColors.textPrimary,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
-                            IconButton(
-                              onPressed: (_isCurrentMonth || _loading)
-                                  ? null
-                                  : _nextMonth,
-                              icon: Icon(Icons.chevron_right_rounded,
-                                  color: _isCurrentMonth
-                                      ? AppTheme.textMuted
-                                      : AppTheme.textPrimary),
+                            const SizedBox(height: 8),
+                            const Text(
+                              'No classes attended this month',
+                              style: TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 14,
+                              ),
                             ),
                           ],
                         ),
-                      ).animate().fadeIn(duration: 400.ms),
+                      );
+                    }
 
-                      const SizedBox(height: 20),
-
-                      // Content
-                      if (_loading)
-                        const Padding(
-                          padding: EdgeInsets.all(60),
-                          child: Column(
+                    return ListView.separated(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      itemCount: records.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 10),
+                      itemBuilder: (context, index) {
+                        final rec = records[index];
+                        return GlassCard(
+                          padding: const EdgeInsets.all(14),
+                          child: Row(
                             children: [
-                              CircularProgressIndicator(
-                                  color: AppTheme.primaryBlue,
-                                  strokeWidth: 2.5),
-                              SizedBox(height: 16),
-                              Text('Loading attendance...',
+                              Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  gradient: AppColors.primaryGradient,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    DateFormat('d').format(rec.markedAt),
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      rec.subject,
+                                      style: const TextStyle(
+                                        color: AppColors.textPrimary,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 15,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      DateFormat('EEEE, d MMM · hh:mm a')
+                                          .format(rec.markedAt),
+                                      style: const TextStyle(
+                                        color: AppColors.textSecondary,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: AppColors.success.withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Text(
+                                  'Present',
                                   style: TextStyle(
-                                      color: AppTheme.textSecondary,
-                                      fontSize: 13)),
-                            ],
-                          ),
-                        )
-                      else if (_error != null)
-                        GlassCard(
-                          backgroundColor:
-                              AppTheme.errorRed.withOpacity(0.1),
-                          borderColor: AppTheme.errorRed.withOpacity(0.3),
-                          child: Column(
-                            children: [
-                              const Icon(Icons.error_outline_rounded,
-                                  color: AppTheme.errorRed, size: 40),
-                              const SizedBox(height: 12),
-                              const Text('Failed to load attendance',
-                                  style: TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppTheme.textPrimary)),
-                              const SizedBox(height: 6),
-                              Text(_error!,
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(
-                                      fontSize: 12,
-                                      color: AppTheme.textSecondary)),
-                              const SizedBox(height: 14),
-                              TextButton(
-                                onPressed: _loadAttendance,
-                                child: const Text('Retry',
-                                    style: TextStyle(
-                                        color: AppTheme.primaryBlue)),
+                                    color: AppColors.success,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
                               ),
                             ],
                           ),
-                        ).animate().fadeIn()
-                      else
-                        _AttendanceContent(
-                          records: _records,
-                          month: _selectedMonth,
-                        ),
-
-                      const SizedBox(height: 32),
-                    ],
+                        );
+                      },
+                    );
+                  },
+                  loading: () => const Center(
+                    child: CircularProgressIndicator(),
+                  ),
+                  error: (e, _) => Center(
+                    child: Text(
+                      'Error loading attendance: $e',
+                      style: const TextStyle(color: AppColors.error),
+                    ),
                   ),
                 ),
               ),
@@ -227,400 +320,5 @@ class _MonthlyAttendanceScreenState
         ),
       ),
     );
-  }
-}
-
-// ─── Attendance content widget ────────────────────────────────────────────────
-
-class _AttendanceContent extends StatelessWidget {
-  final List<AttendanceRecord> records;
-  final DateTime month;
-
-  const _AttendanceContent({required this.records, required this.month});
-
-  @override
-  Widget build(BuildContext context) {
-    final totalDays =
-        DateUtils.getDaysInMonth(month.year, month.month);
-    final presentDays = records.length;
-    final percentage =
-        totalDays > 0 ? (presentDays / totalDays * 100).clamp(0, 100).toDouble() : 0.0;
-
-    return Column(
-      children: [
-        // Stats
-        Row(
-          children: [
-            Expanded(child: _StatCard('Present', '$presentDays',
-                AppTheme.accentGreen, Icons.check_circle_rounded)),
-            const SizedBox(width: 12),
-            Expanded(child: _StatCard('Absent', '${totalDays - presentDays}',
-                AppTheme.errorRed, Icons.cancel_rounded)),
-            const SizedBox(width: 12),
-            Expanded(child: _StatCard('Rate',
-                '${percentage.toStringAsFixed(0)}%',
-                AppTheme.primaryBlue, Icons.pie_chart_rounded)),
-          ],
-        ).animate(delay: 100.ms).fadeIn(),
-        const SizedBox(height: 20),
-
-        // Ring
-        _AttendanceRing(
-            percentage: percentage / 100,
-            present: presentDays,
-            total: totalDays)
-            .animate(delay: 200.ms)
-            .fadeIn()
-            .scale(begin: const Offset(0.9, 0.9)),
-        const SizedBox(height: 20),
-
-        // Calendar
-        _CalendarGrid(
-            month: month,
-            presentDates: records.map((r) => r.markedAt).toList())
-            .animate(delay: 300.ms)
-            .fadeIn(),
-        const SizedBox(height: 20),
-
-        // List
-        if (records.isEmpty)
-          GlassCard(
-            child: Column(
-              children: [
-                const Icon(Icons.event_busy_rounded,
-                    color: AppTheme.textMuted, size: 40),
-                const SizedBox(height: 12),
-                Text(
-                  'No attendance in ${DateFormat('MMMM').format(month)}',
-                  style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.textPrimary),
-                ),
-                const SizedBox(height: 6),
-                const Text(
-                  'Mark attendance using the OTP your teacher provides.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                      fontSize: 13,
-                      color: AppTheme.textSecondary,
-                      height: 1.5),
-                ),
-              ],
-            ),
-          ).animate(delay: 400.ms).fadeIn()
-        else ...[
-          Align(
-            alignment: Alignment.centerLeft,
-            child: const Text('Recent Sessions',
-                style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.textPrimary)),
-          ),
-          const SizedBox(height: 12),
-          ...records.reversed.take(15).toList().asMap().entries.map(
-                (e) => _AttendanceListItem(record: e.value, index: e.key),
-              ),
-        ],
-      ],
-    );
-  }
-}
-
-class _StatCard extends StatelessWidget {
-  final String label;
-  final String value;
-  final Color color;
-  final IconData icon;
-  const _StatCard(this.label, this.value, this.color, this.icon);
-
-  @override
-  Widget build(BuildContext context) {
-    return GlassCard(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
-      child: Column(
-        children: [
-          Icon(icon, color: color, size: 22),
-          const SizedBox(height: 8),
-          Text(value,
-              style: TextStyle(
-                  fontSize: 22, fontWeight: FontWeight.w800, color: color)),
-          const SizedBox(height: 2),
-          Text(label,
-              style: const TextStyle(
-                  fontSize: 11,
-                  color: AppTheme.textMuted,
-                  fontWeight: FontWeight.w500)),
-        ],
-      ),
-    );
-  }
-}
-
-class _AttendanceRing extends StatelessWidget {
-  final double percentage;
-  final int present;
-  final int total;
-  const _AttendanceRing(
-      {required this.percentage, required this.present, required this.total});
-
-  Color get _color {
-    if (percentage >= 0.75) return AppTheme.accentGreen;
-    if (percentage >= 0.50) return AppTheme.accentOrange;
-    return AppTheme.errorRed;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return GlassCard(
-      child: Row(
-        children: [
-          SizedBox(
-            width: 100, height: 100,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                SizedBox.expand(
-                  child: CircularProgressIndicator(
-                    value: percentage,
-                    strokeWidth: 10,
-                    backgroundColor: AppTheme.glassWhite,
-                    valueColor: AlwaysStoppedAnimation<Color>(_color),
-                    strokeCap: StrokeCap.round,
-                  ),
-                ),
-                Text('${(percentage * 100).toStringAsFixed(0)}%',
-                    style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: _color)),
-              ],
-            ),
-          ),
-          const SizedBox(width: 24),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  percentage >= 0.75
-                      ? 'Excellent!'
-                      : percentage >= 0.50
-                          ? 'Needs Improvement'
-                          : total == 0
-                              ? 'No data yet'
-                              : 'Critical',
-                  style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: _color),
-                ),
-                const SizedBox(height: 6),
-                Text('$present out of $total days attended',
-                    style: const TextStyle(
-                        fontSize: 13, color: AppTheme.textSecondary)),
-                if (percentage < 0.75 && total > 0) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    'Need ${((0.75 * total) - present).ceil()} more for 75%',
-                    style: const TextStyle(
-                        fontSize: 12, color: AppTheme.accentOrange),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CalendarGrid extends StatelessWidget {
-  final DateTime month;
-  final List<DateTime> presentDates;
-  const _CalendarGrid({required this.month, required this.presentDates});
-
-  @override
-  Widget build(BuildContext context) {
-    final daysInMonth = DateUtils.getDaysInMonth(month.year, month.month);
-    final firstDay = DateTime(month.year, month.month, 1);
-    final startWeekday = firstDay.weekday % 7; // Sun=0
-    final presentSet = presentDates.map((d) => d.day).toSet();
-    final today = DateTime.now();
-
-    return GlassCard(
-      child: Column(
-        children: [
-          Row(
-            children: ['S', 'M', 'T', 'W', 'T', 'F', 'S']
-                .map((d) => Expanded(
-                      child: Center(
-                        child: Text(d,
-                            style: const TextStyle(
-                                fontSize: 12,
-                                color: AppTheme.textMuted,
-                                fontWeight: FontWeight.w600)),
-                      ),
-                    ))
-                .toList(),
-          ),
-          const SizedBox(height: 8),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 7,
-              childAspectRatio: 1,
-              mainAxisSpacing: 4,
-              crossAxisSpacing: 4,
-            ),
-            itemCount: daysInMonth + startWeekday,
-            itemBuilder: (ctx, i) {
-              if (i < startWeekday) return const SizedBox();
-              final day = i - startWeekday + 1;
-              final isPresent = presentSet.contains(day);
-              final isToday = month.year == today.year &&
-                  month.month == today.month &&
-                  day == today.day;
-              final isFuture =
-                  DateTime(month.year, month.month, day).isAfter(today);
-
-              return Container(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: isPresent
-                      ? AppTheme.accentGreen.withOpacity(0.2)
-                      : isToday
-                          ? AppTheme.primaryBlue.withOpacity(0.15)
-                          : null,
-                  border: isToday
-                      ? Border.all(
-                          color: AppTheme.primaryBlue.withOpacity(0.5))
-                      : isPresent
-                          ? Border.all(
-                              color: AppTheme.accentGreen.withOpacity(0.5))
-                          : null,
-                ),
-                child: Center(
-                  child: Text('$day',
-                      style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: isPresent || isToday
-                              ? FontWeight.w700
-                              : FontWeight.w400,
-                          color: isPresent
-                              ? AppTheme.accentGreen
-                              : isToday
-                                  ? AppTheme.primaryBlue
-                                  : isFuture
-                                      ? AppTheme.textMuted
-                                      : AppTheme.textSecondary)),
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _Legend(AppTheme.accentGreen, 'Present'),
-              const SizedBox(width: 16),
-              _Legend(AppTheme.primaryBlue, 'Today'),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Legend extends StatelessWidget {
-  final Color color;
-  final String label;
-  const _Legend(this.color, this.label);
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(mainAxisSize: MainAxisSize.min, children: [
-      Container(
-          width: 10,
-          height: 10,
-          decoration: BoxDecoration(shape: BoxShape.circle, color: color)),
-      const SizedBox(width: 5),
-      Text(label,
-          style:
-              const TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
-    ]);
-  }
-}
-
-class _AttendanceListItem extends StatelessWidget {
-  final AttendanceRecord record;
-  final int index;
-  const _AttendanceListItem({required this.record, required this.index});
-
-  @override
-  Widget build(BuildContext context) {
-    return GlassCard(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      margin: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        children: [
-          Container(
-            width: 44, height: 44,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              color: AppTheme.accentGreen.withOpacity(0.15),
-              border: Border.all(
-                  color: AppTheme.accentGreen.withOpacity(0.3)),
-            ),
-            child: Center(
-              child: Text(
-                DateFormat('dd').format(record.markedAt),
-                style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    color: AppTheme.accentGreen),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(record.subject,
-                    style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.textPrimary)),
-                const SizedBox(height: 2),
-                Text(
-                    DateFormat('EEE, MMM dd · hh:mm a')
-                        .format(record.markedAt),
-                    style: const TextStyle(
-                        fontSize: 12, color: AppTheme.textSecondary)),
-              ],
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              const Icon(Icons.check_circle_rounded,
-                  color: AppTheme.accentGreen, size: 18),
-              const SizedBox(height: 2),
-              Text('${record.distanceFromTeacher.toStringAsFixed(0)}m',
-                  style: const TextStyle(
-                      fontSize: 11, color: AppTheme.textMuted)),
-            ],
-          ),
-        ],
-      ),
-    )
-        .animate(delay: Duration(milliseconds: index * 50))
-        .fadeIn()
-        .slideX(begin: 0.1);
   }
 }

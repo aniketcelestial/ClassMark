@@ -1,194 +1,172 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import '../../../core/constants/app_routes.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/models/user_model.dart';
 import '../../../shared/widgets/animated_bg.dart';
 import '../../../shared/widgets/glass_card.dart';
 import '../../auth/controllers/auth_controller.dart';
-import 'enter_otp_screen.dart';
-import 'monthly_attendance_screen.dart';
 
 class StudentDashboardScreen extends ConsumerWidget {
-  const StudentDashboardScreen({super.key});
+  final UserModel student;
+  const StudentDashboardScreen({super.key, required this.student});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(currentUserProvider);
+    final now = DateTime.now();
 
     return Scaffold(
-      body: AnimatedMeshBackground(
-        colors: const [
-          AppTheme.accentCyan,
-          AppTheme.accentGreen,
-          AppTheme.primaryBlue,
-        ],
+      body: AnimatedBg(
         child: SafeArea(
-          child: Column(
-            children: [
-              // Top bar
-              Padding(
-                padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
-                child: Row(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 20),
+                // Header
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Welcome back,',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: AppTheme.textSecondary,
-                            ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Hello,',
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 15,
                           ),
-                          Text(
-                            user?.name ?? 'Student',
-                            style: const TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w700,
-                              color: AppTheme.textPrimary,
-                            ),
+                        ),
+                        Text(
+                          student.name,
+                          style: const TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 24,
+                            fontWeight: FontWeight.w700,
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                    GlassCard(
-                      padding: const EdgeInsets.all(10),
-                      borderRadius: 14,
+                    GestureDetector(
                       onTap: () async {
-                        await ref
-                            .read(currentUserProvider.notifier)
-                            .signOut();
-                        if (context.mounted) {
-                          Navigator.pushNamedAndRemoveUntil(
-                            context,
-                            AppRoutes.roleSelect,
-                            (route) => false,
-                          );
-                        }
+                        await ref.read(authNotifierProvider.notifier).signOut();
+                        if (context.mounted) context.go(AppRoutes.roleSelect);
                       },
-                      child: const Icon(Icons.logout_rounded,
-                          color: AppTheme.textSecondary, size: 22),
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.glassBorder),
+                        ),
+                        child: const Icon(Icons.logout_rounded,
+                            color: AppColors.textSecondary, size: 20),
+                      ),
                     ),
                   ],
                 ),
-              ).animate().fadeIn(duration: 400.ms),
-              const SizedBox(height: 8),
-              // Roll / class chip
-              if (user?.rollNumber != null)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: AppTheme.accentCyan.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                            color: AppTheme.accentCyan.withOpacity(0.3)),
-                      ),
-                      child: Text(
-                        'Roll: ${user!.rollNumber} · ${user.className ?? ""}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppTheme.accentCyan,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
+                const SizedBox(height: 4),
+                Text(
+                  student.enrollmentNumber ?? '',
+                  style: const TextStyle(
+                    color: AppColors.accent,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
                   ),
-                ).animate(delay: 100.ms).fadeIn(),
-              const SizedBox(height: 28),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                ),
+                const SizedBox(height: 32),
+
+                // Date card
+                GlassCard(
+                  padding: const EdgeInsets.all(18),
+                  child: Row(
                     children: [
-                      const Text(
-                        'Actions',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.textPrimary,
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          gradient: AppColors.accentGradient,
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                      ).animate(delay: 200.ms).fadeIn(),
-                      const SizedBox(height: 16),
-                      _ActionCard(
-                        title: 'Mark Attendance',
-                        description:
-                            'Enter the OTP shared by your teacher to mark your presence',
-                        icon: Icons.fingerprint_rounded,
-                        colors: AppTheme.studentGradient,
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) => const EnterOtpScreen()),
-                        ),
-                        delay: 300,
+                        child: const Icon(Icons.calendar_today_rounded,
+                            color: Colors.white, size: 22),
                       ),
-                      const SizedBox(height: 16),
-                      _ActionCard(
-                        title: 'My Attendance',
-                        description:
-                            'Check your monthly attendance records and percentage',
-                        icon: Icons.calendar_month_rounded,
-                        colors: [
-                          AppTheme.primaryPurple,
-                          AppTheme.primaryBlue,
+                      const SizedBox(width: 16),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            DateFormat('EEEE').format(now),
+                            style: const TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 13,
+                            ),
+                          ),
+                          Text(
+                            DateFormat('d MMMM yyyy').format(now),
+                            style: const TextStyle(
+                              color: AppColors.textPrimary,
+                              fontSize: 17,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ],
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) =>
-                                  const MonthlyAttendanceScreen()),
-                        ),
-                        delay: 400,
                       ),
-                      const SizedBox(height: 32),
-                      // Info card
-                      GlassCard(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                const Icon(
-                                  Icons.shield_outlined,
-                                  color: AppTheme.accentCyan,
-                                  size: 18,
-                                ),
-                                const SizedBox(width: 8),
-                                const Text(
-                                  'Proximity Verification',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppTheme.textPrimary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            const Text(
-                              'Attendance is only accepted when you are physically within 20 meters of your teacher. This prevents proxy attendance.',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: AppTheme.textSecondary,
-                                height: 1.6,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ).animate(delay: 500.ms).fadeIn(),
                     ],
                   ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 20),
+
+                // Action Cards
+                _ActionCard(
+                  icon: Icons.keyboard_rounded,
+                  title: 'Enter OTP',
+                  subtitle: 'Mark your attendance for today',
+                  gradient: AppColors.primaryGradient,
+                  onTap: () => context.push(
+                    AppRoutes.enterOtp,
+                    extra: student,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _ActionCard(
+                  icon: Icons.bar_chart_rounded,
+                  title: 'Monthly Attendance',
+                  subtitle: 'View your attendance history',
+                  gradient: AppColors.accentGradient,
+                  onTap: () => context.push(
+                    AppRoutes.monthlyAttendance,
+                    extra: student,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                // BLE info banner
+                GlassCard(
+                  padding: const EdgeInsets.all(14),
+                  borderColor: AppColors.warning.withOpacity(0.3),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline_rounded,
+                          color: AppColors.warning, size: 20),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          'Keep Bluetooth ON to verify proximity when marking attendance',
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -196,110 +174,56 @@ class StudentDashboardScreen extends ConsumerWidget {
   }
 }
 
-class _ActionCard extends StatefulWidget {
-  final String title;
-  final String description;
+class _ActionCard extends StatelessWidget {
   final IconData icon;
-  final List<Color> colors;
+  final String title;
+  final String subtitle;
+  final Gradient gradient;
   final VoidCallback onTap;
-  final int delay;
 
   const _ActionCard({
-    required this.title,
-    required this.description,
     required this.icon,
-    required this.colors,
+    required this.title,
+    required this.subtitle,
+    required this.gradient,
     required this.onTap,
-    required this.delay,
   });
 
   @override
-  State<_ActionCard> createState() => _ActionCardState();
-}
-
-class _ActionCardState extends State<_ActionCard> {
-  bool _pressed = false;
-
-  @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: (_) => setState(() => _pressed = true),
-      onTapUp: (_) {
-        setState(() => _pressed = false);
-        widget.onTap();
-      },
-      onTapCancel: () => setState(() => _pressed = false),
-      child: AnimatedScale(
-        scale: _pressed ? 0.97 : 1.0,
-        duration: const Duration(milliseconds: 100),
-        child: GlassCard(
-          borderColor: widget.colors.first.withOpacity(0.3),
-          boxShadow: [
-            BoxShadow(
-              color: widget.colors.first.withOpacity(0.12),
-              blurRadius: 20,
-              offset: const Offset(0, 6),
-            )
-          ],
-          child: Row(
-            children: [
-              Container(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  gradient: LinearGradient(
-                    colors: widget.colors,
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: widget.colors.first.withOpacity(0.35),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Icon(widget.icon, color: Colors.white, size: 28),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      widget.title,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      widget.description,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppTheme.textSecondary,
-                        height: 1.4,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Icon(
-                Icons.arrow_forward_ios_rounded,
-                color: widget.colors.first.withOpacity(0.6),
-                size: 16,
-              ),
-            ],
+    return GlassCard(
+      onTap: onTap,
+      child: Row(
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              gradient: gradient,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(icon, color: Colors.white, size: 26),
           ),
-        ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                    style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600)),
+                const SizedBox(height: 3),
+                Text(subtitle,
+                    style: const TextStyle(
+                        color: AppColors.textSecondary, fontSize: 13)),
+              ],
+            ),
+          ),
+          const Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary),
+        ],
       ),
-    ).animate(delay: Duration(milliseconds: widget.delay))
-        .fadeIn(duration: 400.ms)
-        .slideX(begin: 0.1);
+    );
   }
 }

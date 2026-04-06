@@ -1,81 +1,74 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../shared/models/otp_session_model.dart';
 import '../../../shared/models/attendance_model.dart';
-import '../../../shared/services/otp_service.dart';
+import '../../../shared/models/otp_session_model.dart';
+import '../../../shared/models/user_model.dart';
 import '../../../shared/services/ble_service.dart';
-import '../../../core/utils/logger.dart';
+import '../../../shared/services/otp_service.dart';
 
 final otpServiceProvider = Provider<OtpService>((ref) => OtpService());
+final bleServiceProvider = Provider<BleService>((ref) {
+  final service = BleService();
+  ref.onDispose(() => service.dispose());
+  return service;
+});
 
-final activeSessionProvider =
-StateNotifierProvider<ActiveSessionNotifier, OtpSession?>(
-      (ref) => ActiveSessionNotifier(ref.read(otpServiceProvider)),
+// Active OTP session watcher
+final activeSessionProvider = StreamProvider.family<OtpSessionModel?, String>(
+      (ref, teacherId) {
+    return ref.watch(otpServiceProvider).watchActiveSession(teacherId);
+  },
 );
 
-class ActiveSessionNotifier extends StateNotifier<OtpSession?> {
+// Present students watcher
+final presentStudentsProvider =
+StreamProvider.family<List<AttendanceModel>, String>(
+      (ref, sessionId) {
+    return ref.watch(otpServiceProvider).getPresentStudentsForSession(sessionId);
+  },
+);
+
+class TeacherNotifier extends StateNotifier<AsyncValue<OtpSessionModel?>> {
   final OtpService _otpService;
-  ActiveSessionNotifier(this._otpService) : super(null);
+  final BleService _bleService;
 
-  Future<String?> generateOtp({
-    required String teacherId,
-    required String teacherName,
+  TeacherNotifier(this._otpService, this._bleService)
+      : super(const AsyncValue.data(null));
+
+  Future<OtpSessionModel?> generateOtp({
+    required UserModel teacher,
     required String subject,
-    required String className,
   }) async {
+    state = const AsyncValue.loading();
     try {
-      debugPrint('>>> GENERATE OTP CALLED');
-
-      final btResult = await BleService.getBluetoothAddress()
-          .timeout(const Duration(seconds: 5), onTimeout: () {
-        return (id: 'SESSION_${DateTime.now().millisecondsSinceEpoch}', error: null);
-      });
-
-      debugPrint('>>> BT result: ${btResult.id}');
-
-      final session = await _otpService.createOtpSession(
-        teacherId: teacherId,
-        teacherName: teacherName,
+      // Start BLE advertising so students can detect the teacher
+      await _bleService.startAdvertising();
+      final session = await _otpService.generateOtpSession(
+        teacher: teacher,
         subject: subject,
-        className: className,
-        bluetoothId: btResult.id ?? 'SESSION_${DateTime.now().millisecondsSinceEpoch}',
-      ).timeout(const Duration(seconds: 10), onTimeout: () {
-        throw Exception('Firestore timeout — check internet connection');
-      });
-
-      state = session;
-      debugPrint('>>> OTP generated: ${session.otp}');
+      );
+      state = AsyncValue.data(session);
+      return session;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
       return null;
-    } catch (e, stack) {
-      debugPrint('>>> generateOtp ERROR: $e');
-      debugPrint('>>> $stack');
-      return 'Error: ${e.toString()}';
     }
   }
 
-  Future<void> loadActiveSession(String teacherId) async {
+  Future<void> deactivateSession(String sessionId) async {
     try {
-      final session = await _otpService.getActiveSession(teacherId);
-      appLogger.i('Loaded session: ${session?.otp ?? 'none'}');
-      state = session;
-    } catch (e, stack) {
-      appLogger.e('Load session error', error: e, stackTrace: stack);
-    }
-  }
-
-  Future<void> deactivateSession() async {
-    if (state == null) return;
-    try {
-      await _otpService.deactivateSession(state!.id);
-      state = null;
-    } catch (e) {
-      appLogger.e('Deactivate error: $e');
+      await _bleService.stopAdvertising();
+      await _otpService.deactivateSession(sessionId);
+      state = const AsyncValue.data(null);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
     }
   }
 }
 
-final presentStudentsProvider =
-StreamProvider.family<List<AttendanceRecord>, String>(
-      (ref, sessionId) =>
-      ref.read(otpServiceProvider).getPresentStudents(sessionId),
-);
+final teacherNotifierProvider =
+StateNotifierProvider<TeacherNotifier, AsyncValue<OtpSessionModel?>>((ref) {
+  return TeacherNotifier(
+    ref.watch(otpServiceProvider),
+    ref.watch(bleServiceProvider),
+  );
+});
