@@ -366,6 +366,14 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
+  flutter_ble_peripheral:
+    dependency: "direct main"
+    description:
+      name: flutter_ble_peripheral
+      sha256: ba329874b295e3751666e3aebbf951aa759a6e7009754f5d980f668befa92b9b
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.2.6"
   flutter_blue_plus:
     dependency: "direct main"
     description:

@@ -92,6 +92,7 @@ class StudentNotifier extends StateNotifier<StudentSubmitState> {
           } else {
             final isNear = await _bleService.isStudentNearTeacher(
               teacherDeviceName: deviceName,
+              sessionId: session.id,
             );
             state = state.copyWith(isScanning: false);
 

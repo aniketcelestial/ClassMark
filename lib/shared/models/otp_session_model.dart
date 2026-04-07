@@ -10,6 +10,7 @@ class OtpSessionModel {
   final bool isActive;
   final String subject;
   final String teacherDeviceName;
+  String get shortId => id.length >= 8 ? id.substring(0, 8).toUpperCase() : id;
 
   OtpSessionModel({
     required this.id,

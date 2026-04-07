@@ -1,3 +1,5 @@
+import 'package:classmark/core/utils/logger.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../shared/models/attendance_model.dart';
 import '../../../shared/models/otp_session_model.dart';
@@ -39,13 +41,20 @@ class TeacherNotifier extends StateNotifier<AsyncValue<OtpSessionModel?>> {
     state = const AsyncValue.loading();
     try {
       // Get teacher's own Bluetooth device name
-      final deviceName = await _bleService.startAdvertising();
+      final tempName = await FlutterBluePlus.adapterName.catchError((_) => 'ClassMark');
 
       final session = await _otpService.generateOtpSession(
         teacher: teacher,
         subject: subject,
-        teacherDeviceName: deviceName,
+        teacherDeviceName: tempName,
       );
+
+      final deviceName = await _bleService.startAdvertising(
+        sessionId: session.id,
+      );
+
+      appLogger.i('Teacher advertising: $deviceName for session: ${session.id}');
+
       state = AsyncValue.data(session);
       return session;
     } catch (e, st) {

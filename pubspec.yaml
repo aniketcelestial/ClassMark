@@ -22,6 +22,7 @@ dependencies:
 
   # BLE
   flutter_blue_plus: ^1.32.12
+  flutter_ble_peripheral: ^1.0.1
 
   #device_info
   device_info_plus: ^10.1.0
